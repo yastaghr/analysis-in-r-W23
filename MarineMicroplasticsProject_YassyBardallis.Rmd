@@ -3,12 +3,13 @@ title: "MARINE MICROPLASTICS DATASET RELATIONSHIP ANALYSIS IN R"
 author: "Yassy Bardallis, Doppler Bardallis"
 date: "2023-03-10"
 output: html_document
+bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 SEA_MICRO <- read.csv("SEA_MICRO.csv")
-attach(SEA_MICRO)
+colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 ```
 
 ## DATASET
@@ -20,7 +21,7 @@ For this project, we have chosen to work with a dataset on marine microplastic d
 Marine microplastics, defined as plastic particles under 5mm, pervade our ecosystem. They have been found in everything from [fish](https://www.mdpi.com/2673-8929/1/1/12) to [human placentae](https://ehp.niehs.nih.gov/doi/10.1289/EHP10873); while we are still exploring the impact they have on our world, they are known to be detrimental to the health and life of coral, one study of this phenomenon [can be found here](https://www.nature.com/articles/s42003-021-01961-1). Other species, including us, have been and are being investigated. [You can learn more about this ongoing research here](http://libproxy.uoregon.edu/login?url=https://search.ebscohost.com/login.aspx?direct=true&db=aph&AN=147699782&login.asp&site=ehost-live&scope=site). As the marine world is intricately intertwined with our own, research into their movements is imperative. \### MAKEUP OF THE DATASET The 7755 observations within this dataset are each described by the date they were collected, the longitude and latitude at which they were collected, and the number of pieces of microplastic per kilometer squared. This last value was determined by the method found on pages 10-19 of the manual that was written and published according to the project's goal [found here](https://repository.library.noaa.gov/view/noaa/10296). These samples are not necessarily ordered or random but likely were drawn from sources available to the researchers at the time. The authors of this project could not determine this because neither the manual nor the poster of the Kaggle dataset recorded this information. Due to this lack of knowledge, we cannot determine the amount of noise in this dataset. We could not discover by whom the original water samples were collected or by what groups. However, we believe that, due to the standardized method used to process this data referred to above, any error in the content of this dataset is limited only by the limitations of our knowledge rather than any disparity in collection methodology.\
 We did not preprocess this data in any way; however, it may or may not have undergone this process before its posting on Kaggle. We know of at least three projects that have used this dataset in the past, although there may be more. The manual itself [can be found here](https://repository.library.noaa.gov/view/noaa/10296). Two more projects were connected to the dataset posting on Kaggle; a project in marine data visualization [which can be found here](https://www.kaggle.com/code/virajkadam/marine-plastic-visualization) and a project on the process of analyzing marine data [that can be found here](https://www.kaggle.com/code/brsdincer/marine-micro-plastic-analysis-process). It is undoubtedly a dataset that can be used in future research and analysis of the marine microplastic density and dispersion from 1986 to 2012, albeit with caution due to the uncertain background of that data.
 
-###  PROCESSING THE DATASET
+### PROCESSING THE DATASET
 
 A sample of the observations contained within the dataset shows that there exist within it multiple sets of observations taken on the same day at different locations across the globe.
 
@@ -31,19 +32,33 @@ knitr::kable(SEA_MICRO[1:16,], caption = "Entries 1-16 of the SEA_MICRO Dataset"
 This lead us to a problem, as analysis using the `ts()` data format is intended to be done with univariate data which is equally spaced in time. However, it was a useful format for discovering enough basic statistics about this dataset to determine a better format for our analysis. These facts can be seen below.
 
 ```{r}
-ts.dates.sea_micro <- ts(data = Date)
+ts.dates.sea_micro <- ts(data = SEA_MICRO$times)
 uniq.dates.seamicro <- unique(ts.dates.sea_micro)
 print("Number of distinct dates on which samples were taken:")
 distinct.dates.seamicro <- length(uniq.dates.seamicro)
 distinct.dates.seamicro
 print("Maximum gap between data points:")
-spacing.dates.seamicro <- diff(as.Date(Date))
+spacing.dates.seamicro <- diff(as.Date(SEA_MICRO$times))
 gap.max.dates.seamicro <- max(spacing.dates.seamicro)
 gap.max.dates.seamicro
 print("Number of data points with a shared date:")
-dup.date.seamicro <- Date[duplicated(Date)]
+dup.date.seamicro <- Date[duplicated(SEA_MICRO$times)]
 length(dup.date.seamicro)
 print("Number of dates with multiple data points:")
 uniq.dup.date.seamicro <- unique(dup.date.seamicro)
 length(uniq.dup.date.seamicro)
+```
+
+#### OCE PACKAGE
+
+After some digging, we were able to locate a package, `oce`, for processing this data which contains a format that, rather than being dependent on the observation's time, is arranged by the latitude and longitude of the observation. This package is used in the oceanographic community for working with application-specific data in R [@oceanogr2018]. Within this package are several classes to store different types of data; we have chosen to use the `gps-class` as our storage type. In the `oce` package, data is stored in these three slots: `data`, `metadata`, and `processingLog`. For gps objects, `data` stores lists of the `Latitude` and `Longitude`, `metadata` stores lists of other types of data (in our case we have `Times` and `Pieces_KM2`), and `processingLog` stores a changelog-like list of text entries.
+
+```{r}
+#install.packages("oce")
+#install.packages("sf")
+#library(oce)
+#library(sf)
+gps.seamicro <- as.gps(SEA_MICRO)
+gps.seamicro <- oceSetMetadata(gps.seamicro, name = "pieces_km2", value = SEA_MICRO$pieces_km2, note = "")
+gps.seamicro <- oceSetMetadata(gps.seamicro, name = "times", value = as.POSIXct(SEA_MICRO$times), note = "")
 ```

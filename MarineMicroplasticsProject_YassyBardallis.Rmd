@@ -133,7 +133,7 @@ mapImage(topoWorld)
 mapGrid(dlongitude = 5, dlatitude = 5, col = "black", lty = "dotdash", lwd = 0.2)
 mapPoints(longitude = gps.workingset@data[["longitude"]], latitude = gps.workingset@data[["latitude"]], pch = 10, col = "#500050", cex = 0.2)
 mapScalebar(x = "topleft", y = NULL, lwd = 1, col = "black")
-title(main = "OBSERVATIONS IN WORKING SET", sub = "Observations from 1986 to 2012", xlab = "LONGITUDE (marks every five degrees)", ylab = "LATITUDE (marks every five degrees)")
+title(main = "OBSERVATIONS IN WORKING SET", sub = "Observations from 1986 to 2008", xlab = "LONGITUDE (marks every five degrees)", ylab = "LATITUDE (marks every five degrees)")
 ```
 
 #### MODEL FOCUS
@@ -170,6 +170,21 @@ Our intended model does not have separate response and predictor variables; rath
 #### SEPARATION CHOICE
 
 Because of the circumstantial limitations imposed by this dataset, we will be analyzing a model which combines the interpolated microplastic density data from past years, with a weight function determining the importance of each past year's data, to estimate the interpolated density of a future year. This model is analogous to a linear regression model; however, rather than a training set and a test set, we have the set of past values and the future values given by the data set.
+
+```{r}
+labels.years.ws <- seq(from = 1986, to = 2008, by = 1)
+range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = as.POSIXct("2008-01-01", tz = ""), by = "year"), seq(from = as.POSIXct("1986-12-31", tz = ""), to = as.POSIXct("2008-12-31", tz = ""), by = "year"))
+colnames(range.years.ws) <- c("Start", "End")
+rownames(range.years.ws) <- labels.years.ws
+ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
+grid.lat <- seq(from = 10, to = 48, by = 0.1)
+grid.long <- seq(from = -87, to = -51.5, by = 0.1)
+grid.dim <- c(grid.long, grid.lat)
+blank.grid <- matrix(data = rep(0, times = length(grid.long)* length(grid.lat)), nrow = length(grid.lat), ncol = length(grid.long))
+rownames(blank.grid) <- grid.lat
+colnames(blank.grid) <- grid.long
+ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = seq(from = -70.2, to = -56.6, by = 0.1), yg = seq(from = 11, to = 41, by = 0.1), iterations = 1, pregrid = TRUE)
+```
 
 #### MODEL OUTLINE
 

@@ -8,6 +8,10 @@ bibliography: references.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+install.packages("oce")
+install.packages("interp")
+library(interp)
+library(oce)
 SEA_MICRO <- read.csv("SEA_MICRO.csv")
 colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 ```
@@ -18,7 +22,11 @@ colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 
 For this project, we have chosen to work with a dataset on marine microplastic density in samples drawn from seawater worldwide. These datasets contain information quantifying the presence of microplastics at specific points in the world on specific dates. This dataset is termed the "SEA_MICRO" dataset and was acquired from [kaggle.com](https://www.kaggle.com/datasets/brsdincer/marine-microplastic-on-world-density-noaa) on 2023-02-24 at 10:43:05; however, the original data was used in the project funded by a grant from the NOAA Marine Debris Program to the University of Washington, Tacoma [referenced here](https://marinedebris.noaa.gov/technical-memorandum/laboratory-methods-analysis-microplastics-marine-environment) which sought to create a series of simple standardized methods for collecting and measuring the quantity of microplastics in water samples, samples of sediments from the bed of the body of water, and personal care products.
 
-Marine microplastics, defined as plastic particles under 5mm, pervade our ecosystem. They have been found in everything from [fish](https://www.mdpi.com/2673-8929/1/1/12) to [human placentae](https://ehp.niehs.nih.gov/doi/10.1289/EHP10873); while we are still exploring the impact they have on our world, they are known to be detrimental to the health and life of coral, one study of this phenomenon [can be found here](https://www.nature.com/articles/s42003-021-01961-1). Other species, including us, have been and are being investigated. [You can learn more about this ongoing research here](http://libproxy.uoregon.edu/login?url=https://search.ebscohost.com/login.aspx?direct=true&db=aph&AN=147699782&login.asp&site=ehost-live&scope=site). As the marine world is intricately intertwined with our own, research into their movements is imperative. \### MAKEUP OF THE DATASET The 7755 observations within this dataset are each described by the date they were collected, the longitude and latitude at which they were collected, and the number of pieces of microplastic per kilometer squared. This last value was determined by the method found on pages 10-19 of the manual that was written and published according to the project's goal [found here](https://repository.library.noaa.gov/view/noaa/10296). These samples are not necessarily ordered or random but likely were drawn from sources available to the researchers at the time. The authors of this project could not determine this because neither the manual nor the poster of the Kaggle dataset recorded this information. Due to this lack of knowledge, we cannot determine the amount of noise in this dataset. We could not discover by whom the original water samples were collected or by what groups. However, we believe that, due to the standardized method used to process this data referred to above, any error in the content of this dataset is limited only by the limitations of our knowledge rather than any disparity in collection methodology.\
+Marine microplastics, defined as plastic particles under 5mm, pervade our ecosystem. They have been found in everything from [fish](https://www.mdpi.com/2673-8929/1/1/12) to [human placentae](https://ehp.niehs.nih.gov/doi/10.1289/EHP10873); while we are still exploring the impact they have on our world, they are known to be detrimental to the health and life of coral, one study of this phenomenon [can be found here](https://www.nature.com/articles/s42003-021-01961-1). Other species, including us, have been and are being investigated. [You can learn more about this ongoing research here](http://libproxy.uoregon.edu/login?url=https://search.ebscohost.com/login.aspx?direct=true&db=aph&AN=147699782&login.asp&site=ehost-live&scope=site). As the marine world is intricately intertwined with our own, research into their movements is imperative.
+
+### MAKEUP OF THE DATASET
+
+The 7755 observations within this dataset are each described by the date they were collected, the longitude and latitude at which they were collected, and the number of pieces of microplastic per kilometer squared. This last value was determined by the method found on pages 10-19 of the manual that was written and published according to the project's goal [found here](https://repository.library.noaa.gov/view/noaa/10296). These samples are not necessarily ordered or random but likely were drawn from sources available to the researchers at the time. The authors of this project could not determine this because neither the manual nor the poster of the Kaggle dataset recorded this information. Due to this lack of knowledge, we cannot determine the amount of noise in this dataset. We could not discover by whom the original water samples were collected or by what groups. However, we believe that, due to the standardized method used to process this data referred to above, any error in the content of this dataset is limited only by the limitations of our knowledge rather than any disparity in collection methodology.\
 We did not preprocess this data in any way; however, it may or may not have undergone this process before its posting on Kaggle. We know of at least three projects that have used this dataset in the past, although there may be more. The manual itself [can be found here](https://repository.library.noaa.gov/view/noaa/10296). Two more projects were connected to the dataset posting on Kaggle; a project in marine data visualization [which can be found here](https://www.kaggle.com/code/virajkadam/marine-plastic-visualization) and a project on the process of analyzing marine data [that can be found here](https://www.kaggle.com/code/brsdincer/marine-micro-plastic-analysis-process). It is undoubtedly a dataset that can be used in future research and analysis of the marine microplastic density and dispersion from 1986 to 2012, albeit with caution due to the uncertain background of that data.
 
 ### PROCESSING THE DATASET
@@ -42,7 +50,7 @@ spacing.dates.seamicro <- diff(as.Date(SEA_MICRO$times))
 gap.max.dates.seamicro <- max(spacing.dates.seamicro)
 gap.max.dates.seamicro
 print("Number of data points with a shared date:")
-dup.date.seamicro <- Date[duplicated(SEA_MICRO$times)]
+dup.date.seamicro <- SEA_MICRO$times[duplicated(SEA_MICRO$times)]
 length(dup.date.seamicro)
 print("Number of dates with multiple data points:")
 uniq.dup.date.seamicro <- unique(dup.date.seamicro)
@@ -51,14 +59,130 @@ length(uniq.dup.date.seamicro)
 
 #### OCE PACKAGE
 
-After some digging, we were able to locate a package, `oce`, for processing this data which contains a format that, rather than being dependent on the observation's time, is arranged by the latitude and longitude of the observation. This package is used in the oceanographic community for working with application-specific data in R [@oceanogr2018]. Within this package are several classes to store different types of data; we have chosen to use the `gps-class` as our storage type. In the `oce` package, data is stored in these three slots: `data`, `metadata`, and `processingLog`. For gps objects, `data` stores lists of the `Latitude` and `Longitude`, `metadata` stores lists of other types of data (in our case we have `Times` and `Pieces_KM2`), and `processingLog` stores a changelog-like list of text entries.
+After some digging, we were able to locate a package, `oce`, for processing this data which contains a format that, rather than being dependent on the observation's time, is arranged by the latitude and longitude of the observation. This package is used in the oceanographic community for working with application-specific data in R [@oceanogr2018]. Within this package are several classes to store different types of data; we have chosen to use the `gps-class` as our storage type. In the `oce` package, data is stored in these three slots: `data`, `metadata`, and `processingLog`. For `gps` objects, `data` stores lists of the `Latitude` and `Longitude`, `metadata` stores lists of other types of data (in our case we have `Times` and `Pieces_KM2`), and `processingLog` stores a changelog-like list of text entries.
 
 ```{r}
-#install.packages("oce")
-#install.packages("sf")
-#library(oce)
-#library(sf)
 gps.seamicro <- as.gps(SEA_MICRO)
 gps.seamicro <- oceSetMetadata(gps.seamicro, name = "pieces_km2", value = SEA_MICRO$pieces_km2, note = "")
 gps.seamicro <- oceSetMetadata(gps.seamicro, name = "times", value = as.POSIXct(SEA_MICRO$times), note = "")
 ```
+
+#### PLOT OF ALL OBSERVATIONS
+
+Before beginning to work with this data set, we found it useful to have a visual of the locations of every data point in this set.
+
+```{r fig.height=5.5, fig.width=6}
+data("topoWorld")
+mapPlot(longitude = gps.seamicro@data[["longitude"]], latitude = gps.seamicro@data[["latitude"]], grid = FALSE, geographical = 0, col = NULL, clip = FALSE, type = "p", axes = FALSE, projection = "+proj=merc", drawBox = FALSE)
+mapImage(topoWorld)
+mapGrid(dlongitude = 15, dlatitude = 15, col = "black", lty = "dotdash", lwd = 0.2)
+mapPoints(longitude = gps.seamicro@data[["longitude"]], latitude = gps.seamicro@data[["latitude"]], pch = 10, col = "#00b300", cex = 0.75)
+title(main = "All Observations in SEA_MICRO", sub = "Observations from 1986 to 2012", outer = FALSE)
+mapScalebar(x = "topleft", y = NULL, lwd = 1, col = "black")
+```
+
+#### SUBSETTING CHOICE: WEST ATLANTIC AND CARIBEAN
+
+Because the number of total observations in the Pacific ocean is much lower than in the West Atlantic and Caribbean, we have chosen to further limit the dataset we will be working with to the more observed region.
+
+##### LATITUDE
+
+To find this region, we determined the latitudinal quartiles of the whole dataset, then plotted the coordinates of all of the observations with colors to indicate each section. As the points in the set we wish to observe were not above the longitudinal first quartile, we estimated that, if the distance between each quartile were to be used to add another subsection of the data points, then all of the observations we wished to use would be included. We estimated this distance to be 8 degrees of latitude. To include this additional section, we used a minimum latitude of 10 degrees north. This set can be seen below, highlighted in yellow, and is where our subset began.
+
+```{r}
+longlat.seamicro <- data.frame("longitude" = SEA_MICRO$longitude, "latitude" = SEA_MICRO$latitude)
+plot(longlat.seamicro)
+summary(longlat.seamicro)
+Q1.longlat <- subset(longlat.seamicro, longlat.seamicro$latitude>=18)
+mean.longlat <- subset(longlat.seamicro, longlat.seamicro$latitude>=25)
+Q3.longlat <- subset(longlat.seamicro, longlat.seamicro$latitude>=33)
+set.longlat <- subset(longlat.seamicro, longlat.seamicro$latitude>=10)
+points(set.longlat, col = "yellow")
+points(Q1.longlat, col = "red")
+points(mean.longlat, col = "green")
+points(Q3.longlat, col = "blue")
+legend(x = "topleft", legend = c("Q3", "MEAN", "Q1", "CHOSEN"), fill = c("blue", "green", "red", "yellow"), angle = 45, density = 50, cex = 0.45)
+```
+
+##### LONGITUDE
+
+Using the set of observations that were determined above, we repeated a similar process with the longitudinal values. We used the median, in this case, because the mean was outside of the needed range. In this case, we eventually arrived at a boundary point at -95 degrees, also known as 95 degrees west.
+
+```{r}
+summary(set.longlat)
+Q1.set.longlat <- subset(set.longlat, set.longlat$longitude>=-82)
+median.set.longlat <- subset(set.longlat, set.longlat$longitude>=-71)
+Q3.set.longlat <- subset(set.longlat, set.longlat$longitude>=-65)
+subset.longlat <- subset(set.longlat, set.longlat$longitude>=-90)
+plot(set.longlat)
+points(subset.longlat, col="yellow")
+points(Q1.set.longlat, col = "green")
+points(median.set.longlat, col = "blue")
+points(Q3.set.longlat, col = "red")
+```
+
+##### FINAL SUBSET
+
+Our final working set is graphed below.
+
+```{r}
+workingset.seamicro <- subset(SEA_MICRO, SEA_MICRO$latitude>=10)
+workingset.seamicro <- subset(workingset.seamicro, workingset.seamicro$longitude>=-90)
+mapPlot(longitude = gps.workingset@data[["longitude"]], latitude = gps.workingset@data[["latitude"]], grid = FALSE, geographical = 0, col = NULL, clip = FALSE, type = "p", axes = FALSE, projection = "+proj=merc", drawBox = FALSE)
+mapImage(topoWorld)
+mapGrid(dlongitude = 5, dlatitude = 5, col = "black", lty = "dotdash", lwd = 0.2)
+mapPoints(longitude = gps.workingset@data[["longitude"]], latitude = gps.workingset@data[["latitude"]], pch = 10, col = "#500050", cex = 0.2)
+mapScalebar(x = "topleft", y = NULL, lwd = 1, col = "black")
+title(main = "OBSERVATIONS IN WORKING SET", sub = "Observations from 1986 to 2012", xlab = "LONGITUDE (marks every five degrees)", ylab = "LATITUDE (marks every five degrees)")
+```
+
+#### MODEL FOCUS
+
+Due to the nature of this data and the format it is now stored in, we have chosen to train a model to predict the density of microplastics in this area per year, both on average and as a coordinate basis. This means we be making a series of density maps showing the relative amounts of microplastic in this area.
+
+#### VISUAL METHODOLOGY: BARNES INTERPOLATION
+
+To start, though, we created a map showing the density of each area over the entire course of the observation period. The values for all contour maps in this report have been determined with the `oce` package's function `interpBarnes` with one iteration. The `interpBarnes` function uses a Barnes interpolation scheme to estimate the values at all locations on a grid given a sparse and irregular spread of data points. The Barnes interpolation scheme was developed for use with meteorological data[@barnes1964], but is now used in oceanography as well.
+
+##### ROUGH DESCRIPTION OF BARNES INTERPOLATION
+
+This function works in iterations; we have arbitrarily chosen to use one. It makes use of a weighted average of all of the points within a given radius (in our case, we are using the function default) to determine the value of the point on the grid in question.
+
+```{r}
+interp.barnes.ws <- interpBarnes(x = workingset.seamicro$longitude, y = workingset.seamicro$latitude, z = workingset.seamicro$pieces_km2, iterations = 1, pregrid = TRUE)
+cm.seamicro <- colormap(zlim = range(interp.barnes.ws$zd))
+drawPalette(colormap = cm.seamicro)
+data("coastlineWorld")
+mapPlot(longitude = workingset.seamicro$longitude, latitude = workingset.seamicro$latitude, projection = "+proj=merc", grid = FALSE)
+mapImage(latitude = interp.barnes.ws$yg, longitude = interp.barnes.ws$xg, z = interp.barnes.ws$zg, colormap = cm.seamicro)
+mapContour(longitude = interp.barnes.ws$xg, latitude = interp.barnes.ws$yg, z = interp.barnes.ws$zg, nlevels = 10, drawlabels = FALSE, col = "red")
+mapGrid(dlongitude = 5, dlatitude = 5)
+mapLines(coastlineWorld, col = "white")
+title(main = "DENSITY MAP AROUND WORKING SET", sub = "Barnes Interpolation with one iteration")
+```
+
+### TEST AND TRAINING SETS
+
+Our intended model does not have separate response and predictor variables; rather, we are hoping to use the data as it changes through time to estimate how that data will look in the future. Regression models are not well suited to this[@james2021], especially due to the inconsistency in the coordinates of data points from year to year that results from the physical constraints that come from working with the ocean and the limited number and track of scientific voyages each year that collected this data.
+
+## MODEL: DENSITY PREDICTION FOR FUTURE YEARS
+
+### HOW IT WORKS
+
+### TRAINING ON THE TRAINING DATASET
+
+?(IF TIME) CROSS-VALIDATION
+
+## TESTING THE MODEL
+
+### AVERAGE ACCURACY
+
+### CHANGE IN ACCURACY OVER TIME
+
+## CONCLUSION
+
+### POTENTIAL USES
+
+### AREAS FOR FURTHER RESEARCH AND REFINEMENT
+
+## BIBLIOGRAPHY

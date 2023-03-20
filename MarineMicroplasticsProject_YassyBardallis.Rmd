@@ -163,26 +163,26 @@ title(main = "DENSITY MAP AROUND WORKING SET", sub = "Barnes Interpolation with 
 
 ### TEST AND TRAINING SETS
 
-Our intended model does not have separate response and predictor variables; rather, we are hoping to use the data as it changes through time to estimate how that data will look in the future. Regression models are not well suited to this[@james2021], especially due to the inconsistency in the coordinates of data points from year to year that results from the physical constraints that come from working with the ocean and the limited number and track of scientific voyages each year that collected this data.
+#### MODEL LIMITATIONS
 
-## MODEL: DENSITY PREDICTION FOR FUTURE YEARS
+Our intended model does not have separate response and predictor variables; rather, we are hoping to use the data as it changes through time to estimate how that data will look in the future. The regression models we studied in class are not well suited to this because of that temporal component [@james2021]; another limiting factor is the inconsistency in the coordinates of data points from year to year that results from the physical constraints that come from working with the ocean and the limited number and track of scientific voyages each year that collected this data.
 
-### HOW IT WORKS
+#### SEPARATION CHOICE
 
-### TRAINING ON THE TRAINING DATASET
+Because of the circumstantial limitations imposed by this dataset, we will be analyzing a model which combines the interpolated microplastic density data from past years, with a weight function determining the importance of each past year's data, to estimate the interpolated density of a future year. This model is analogous to a linear regression model; however, rather than a training set and a test set, we have the set of past values and the future values given by the data set.
 
-?(IF TIME) CROSS-VALIDATION
+#### MODEL OUTLINE
 
-## TESTING THE MODEL
+We will determine the error of each model by applying the combinatorial weight function to the years prior to make our estimate, then subtraction that from the values given by the observations taken in the target year; we will map this error, determined year by year, against models created by using other weight functions. The goal of this process is to estimate the affect that known past locations of particular amounts of microplastics have on future quantities of microplastics at other locations.
 
-### AVERAGE ACCURACY
+#### IRREDUCIBLE ERROR, VARIANCE, AND BIAS
 
-### CHANGE IN ACCURACY OVER TIME
+We know that the irreducible error in this process will be high due to the aforementioned inconsistency and sparsity of our data, the introduction of an unknown amount of microplastics to the ocean in unknown locations, and the unincorporated affect that ocean currents and meteorological events have on the dispersal of said microplastics. Predicting the affects of these influences would be a potential avenue of future research.
+
+## MODEL TRAINING AND ANALYSIS
 
 ## CONCLUSION
 
 ### POTENTIAL USES
-
-### AREAS FOR FURTHER RESEARCH AND REFINEMENT
 
 ## BIBLIOGRAPHY

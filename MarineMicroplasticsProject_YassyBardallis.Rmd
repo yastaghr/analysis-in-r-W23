@@ -169,7 +169,7 @@ Our intended model does not have separate response and predictor variables; rath
 
 #### SEPARATION CHOICE
 
-Because of the circumstantial limitations imposed by this dataset, we will be analyzing a model which combines the interpolated microplastic density data from past years, with a weight function determining the importance of each past year's data, to estimate the interpolated density of a future year. This model is analogous to a linear regression model; however, rather than a training set and a test set, we have the set of past values and the future values given by the data set.
+Because of the circumstantial limitations imposed by this dataset, we will be analyzing a model which combines the microplastic density data from past years to estimate the interpolated density of a future year. This model is analogous to a linear regression model; however, rather than a training set and a test set, we have the set of past values and the future values given by the data set.
 
 ```{r}
 labels.years.ws <- seq(from = 1986, to = 2008, by = 1)
@@ -177,24 +177,34 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
-grid.lat <- seq(from = 10, to = 48, by = 0.1)
-grid.long <- seq(from = -87, to = -51.5, by = 0.1)
-grid.dim <- c(grid.long, grid.lat)
-blank.grid <- matrix(data = rep(0, times = length(grid.long)* length(grid.lat)), nrow = length(grid.lat), ncol = length(grid.long))
-rownames(blank.grid) <- grid.lat
-colnames(blank.grid) <- grid.long
 ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = seq(from = -70.2, to = -56.6, by = 0.1), yg = seq(from = 11, to = 41, by = 0.1), iterations = 1, pregrid = TRUE)
 ```
 
 #### MODEL OUTLINE
 
-We will determine the error of each model by applying the combinatorial weight function to the years prior to make our estimate, then subtraction that from the values given by the observations taken in the target year; we will map this error, determined year by year, against models created by using other weight functions. The goal of this process is to estimate the affect that known past locations of particular amounts of microplastics have on future quantities of microplastics at other locations.
+We will determine the error of each model by applying the combinatorial weight function to the years prior to make our estimate, then subtraction that from the values given by the observations taken in the target year; we will map this error, determined year by year, against models created by using other weight functions. The goal of this process is to estimate the effect that known past locations of particular amounts of microplastics have on future quantities of microplastics at other locations.
 
 #### IRREDUCIBLE ERROR, VARIANCE, AND BIAS
 
 We know that the irreducible error in this process will be high due to the aforementioned inconsistency and sparsity of our data, the introduction of an unknown amount of microplastics to the ocean in unknown locations, and the unincorporated affect that ocean currents and meteorological events have on the dispersal of said microplastics. Predicting the affects of these influences would be a potential avenue of future research.
 
-## MODEL TRAINING AND ANALYSIS
+## MODEL ANALYSIS
+
+We will be testing three different models: the first model, in which the data points from previous years are equally weighted; the second model, where each successive year has twice the weight of the year before it, and the third model, where the last three years have twice the power of the one before it, and the rest are equally weighted at half of the weight of the last of those three.
+
+```{r}
+model1.recent2last.weights <- rep(1, times = 23)
+model2.recent2last.weights <- rep(1, times = 23)
+x = 22
+while (x>0) {
+    model2.recent2last.weights[x] <- 2 * model2.recent2last.weights[x+1];
+    x = x - 1
+}
+model3.recent2last.weights <- rep(1, times = 23)
+model3.recent2last.weights[1] <- 8
+model3.recent2last.weights[2] <- 4
+model3.recent2last.weights[3] <- 2
+```
 
 ## CONCLUSION
 

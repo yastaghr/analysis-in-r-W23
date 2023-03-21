@@ -242,40 +242,100 @@ get.this.set <- function(ind.y) {
     this.set <- subset(half.set, half.set$times>=range.years.ws$Start[ind.y]);
     return(this.set)
 }
-```
-
-### MODEL 1: EQUAL WEIGHTS
-
-```{r}
-overlap.v <- function(x1, x2) {
+overlap.only.v <- function(x1, x2) {
     x1.last <- x1[length(x1)];
     x1.first <- x1[1];
     x2.last <- x2[length(x2)];
     x2.first <- x2[1];
     new1 <- x1;
     new2 <- x2;
+    new.end <- c(length(x1), length(x2));
     if(x1.last>x2.last) {
-        new1 <- new1[new1<=x2.last];
+        new1 <- x1[x1<=x2.last];
+        new.end[1] <- length(new1);
     } else if (x1.last<x2.last) {
-        new2 <- new2[new2<=x1.last];
+        new2 <- x2[x2<=x1.last];
+        new.end[2] <- length(new2);
     } 
+    new.x <- new2;
+    new.start <- c(1, 1);
     if(x1.first>x2.first) {
-        new2 <- new2[new2>=x1.first];
+        new.x <- new2[new2>=x1.first];
+        new.start[2] <- length(x2[x2<x1.first]);
     } else if (x1.first<x2.first) {
-        new1 <- new1[new1>=x2.first];
+        new.x <- new1[new1>=x2.first];
+        new.start[1] <- length(x1[x1<x2.first]);
     }
-    return(list(new1, new2))
+    return(list("vector" = new.x, "start" = new.start, "stop" = new.end))
+}
+overlap.v <- function(small.v, big.v) {
+    s.1st <- small.v[1];
+    b.1st <- big.v[1];
+    s.end <- small.v[length(small.v)];
+    b.end <- big.v[length(big.v)];
+    pad <- 0;
+    new.sv <- small.v;
+    if (s.1st<b.1st) {
+        new.1st <- length(small.v[small.v>=b.1st]);
+        new.sv <- new.sv[new.1st:length(new.sv)];
+    } else if (s.1st>b.1st) {
+        p <- length(big.v[big.v<s.1st]);
+        pad <- rep(0, times = p);
+        new.sv <- c(pad, new.sv);
+    }
+    if (s.end>b.end) {
+        new.sv <- new.sv[new.sv<=b.end];
+    } else if (s.end<b.end) {
+        p <- length(big.v[big.v>s.end]);
+        pad <- rep(0, times = p);
+        new.sv <- c(new.sv, pad);
+    }
+    return(new.sv)
 }
 get.estimate <- function(model.ws, year.index) {
-prev.set <- get.prev.set(year.index-1);
-wv <- gen.full.wv(model.wv = model.ws, num.years = year.index);
-prev.gv <- get.set.gridvals(prev.set);
-pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
-this.set <- get.this.set(year.index);
-this.gv <- get.set.gridvals(this.set);
-actual.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = this.gv$xg, yg = this.gv$yg, iterations = 1);
-
+    prev.set <- get.prev.set(year.index-1);
+    wv <- gen.full.wv(model.wv = model.ws, num.years = year.index);
+    prev.gv <- get.set.gridvals(prev.set);
+    pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
+    return(pred.bi)
 }
+get.actual <- function(year.index) {
+    half.set <- subset(workingset.seamicro, workingset.seamicro$times>=range.years.ws$Start[year.index]);
+    this.set <- subset(half.set, half.set$times<=range.years.ws$End[year.index]);
+    if(length(this.set$times)<=0) {
+        gv <- get.set.gridvals(workingset.seamicro);
+        x <- length(gv$xg);
+        y <- length(gv$yg);
+        wg <- Matrix(data = rep(0, times = x*y), ncol = x, nrow = y);
+        zg <- wg;
+        zd <- rep(0, times = x);
+        return(list("xg" = gv$xg, "yg" = gv$yg, "zg" = zg, "wg" = wg, "zd" = zd));
+    }
+    gv <- get.set.gridvals(this.set);
+    this.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = gv$xg, yg = gv$yg, iterations = 1);
+    return(this.bi);
+}
+get.diff <- function(est.bi, actual.bi) {
+    xover <- overlap.only.v(est.bi$xg, actual.bi$xg);
+    shared.x <- xover$vector;
+    front.x <- actual.bi$xg[actual.bi$xg<xover$start[2]];
+    back.x <- actual.bi$xg[actual.bi$xg>=xover$stop[2]];
+    
+    yover <- overlap.only.v(est.bi$yg, actual.bi$yg);
+    shared.y <- yover$vector;
+    front.y <- actual.bi$yg[actual.bi$yg<yover$start[2]];
+    back.y <- actual.bi$yg[actual.bi$yg>=yover$stop[2]];
+    
+    est.ungridded <- ungrid(est.bi$xg, est.bi$yg, est.bi$zg);
+    actual.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
+    
+}
+```
+
+### MODEL 1: EQUAL WEIGHTS
+
+```{r}
+
 ```
 
 ## CONCLUSION

@@ -129,6 +129,9 @@ Our final working set is graphed below.
 ```{r}
 workingset.seamicro <- subset(SEA_MICRO, SEA_MICRO$latitude>=10)
 workingset.seamicro <- subset(workingset.seamicro, workingset.seamicro$longitude>=-90)
+gps.workingset <- as.gps(workingset.seamicro)
+gps.workingset <- oceSetMetadata(gps.workingset, name = "pieces_km2", value = workingset.seamicro$pieces_km2, note = "")
+gps.workingset <- oceSetMetadata(gps.workingset, name = "times", value = as.POSIXct(workingset.seamicro$times), note = "")
 mapPlot(longitude = gps.workingset@data[["longitude"]], latitude = gps.workingset@data[["latitude"]], grid = FALSE, geographical = 0, col = NULL, clip = FALSE, type = "p", axes = FALSE, projection = "+proj=merc", drawBox = FALSE)
 mapImage(topoWorld)
 mapGrid(dlongitude = 5, dlatitude = 5, col = "black", lty = "dotdash", lwd = 0.2)
@@ -242,55 +245,23 @@ get.this.set <- function(ind.y) {
     this.set <- subset(half.set, half.set$times>=range.years.ws$Start[ind.y]);
     return(this.set)
 }
-overlap.only.v <- function(x1, x2) {
-    x1.last <- x1[length(x1)];
-    x1.first <- x1[1];
-    x2.last <- x2[length(x2)];
-    x2.first <- x2[1];
-    new1 <- x1;
-    new2 <- x2;
-    new.end <- c(length(x1), length(x2));
-    if(x1.last>x2.last) {
-        new1 <- x1[x1<=x2.last];
-        new.end[1] <- length(new1);
-    } else if (x1.last<x2.last) {
-        new2 <- x2[x2<=x1.last];
-        new.end[2] <- length(new2);
-    } 
-    new.x <- new2;
-    new.start <- c(1, 1);
-    if(x1.first>x2.first) {
-        new.x <- new2[new2>=x1.first];
-        new.start[2] <- length(x2[x2<x1.first]);
-    } else if (x1.first<x2.first) {
-        new.x <- new1[new1>=x2.first];
-        new.start[1] <- length(x1[x1<x2.first]);
-    }
-    return(list("vector" = new.x, "start" = new.start, "stop" = new.end))
+set.bi.dimnames <- function(bi) {
+    bi1 <- bi;
+    rownames(bi1$zg) <- bi1$xg;
+    colnames(bi1$zg) <- bi1$yg;
+    return(bi1)
 }
-overlap.v <- function(small.v, big.v) {
-    s.1st <- small.v[1];
-    b.1st <- big.v[1];
-    s.end <- small.v[length(small.v)];
-    b.end <- big.v[length(big.v)];
-    pad <- 0;
-    new.sv <- small.v;
-    if (s.1st<b.1st) {
-        new.1st <- length(small.v[small.v>=b.1st]);
-        new.sv <- new.sv[new.1st:length(new.sv)];
-    } else if (s.1st>b.1st) {
-        p <- length(big.v[big.v<s.1st]);
-        pad <- rep(0, times = p);
-        new.sv <- c(pad, new.sv);
+only.in.v <- function(x1, x2) {
+    x = NULL;
+    for (n in x2) {
+        for (m in x1) {
+            if (m==n) {
+                x <- c(x, m);
+            }
+        }
     }
-    if (s.end>b.end) {
-        new.sv <- new.sv[new.sv<=b.end];
-    } else if (s.end<b.end) {
-        p <- length(big.v[big.v>s.end]);
-        pad <- rep(0, times = p);
-        new.sv <- c(new.sv, pad);
-    }
-    return(new.sv)
+    if (is.null(x)) return(FALSE)
+    return(x)
 }
 get.estimate <- function(model.ws, year.index) {
     prev.set <- get.prev.set(year.index-1);
@@ -315,20 +286,96 @@ get.actual <- function(year.index) {
     this.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = gv$xg, yg = gv$yg, iterations = 1);
     return(this.bi);
 }
-get.diff <- function(est.bi, actual.bi) {
-    xover <- overlap.only.v(est.bi$xg, actual.bi$xg);
-    shared.x <- xover$vector;
-    front.x <- actual.bi$xg[actual.bi$xg<xover$start[2]];
-    back.x <- actual.bi$xg[actual.bi$xg>=xover$stop[2]];
-    
-    yover <- overlap.only.v(est.bi$yg, actual.bi$yg);
-    shared.y <- yover$vector;
-    front.y <- actual.bi$yg[actual.bi$yg<yover$start[2]];
-    back.y <- actual.bi$yg[actual.bi$yg>=yover$stop[2]];
-    
-    est.ungridded <- ungrid(est.bi$xg, est.bi$yg, est.bi$zg);
-    actual.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
-    
+get.v.squared <- function(v) {
+    v.rssquared <- 0;
+    for (n in v) {
+        v.rssquared <- v.rssquared + n^2;
+    }
+    return(v.rssquared)
+}
+get.r.squared <- function(y1, y) {
+    shared.diff <- y - y1;
+    sum.resid.squared <- get.v.squared(shared.diff);
+    sum.act.squared <- get.v.squared(y);
+    r.squared.shared <- 1 - sum.resid.squared/sum.act.squared;
+    return(r.squared.shared)
+}
+get.m.from.xy <- function(m, x, y) {
+    xlen <- length(x);
+    ylen <- length(y);
+    new.m <- matrix(nrow = xlen, ncol = ylen, dimnames = list(x, y));
+    for (i in rownames(m)) {
+        #goes through the row names of rows in m
+        if(!is.null(only.in.v(i, x))) {
+            #if i is a row name in x
+            sus.col <- m[i,];
+            for (j in colnames(m)) {
+                #testing col names in m
+                if (!is.null(only.in.v(j, y))){
+                    #if this column is in y
+                    new.m[i, j] <- m[i,j];
+                }
+                #if column isn't in y, then (i,j) isn't needed in new.m
+            }
+        }
+        #if row isn't in x, then row i  isn't needed in new.m
+    }
+    if (is.na(new.m[xlen, ylen])) return(FALSE)
+    return(new.m)
+}
+get.r.squared.total <- function(est.bi, actual.bi) {
+    xover <- only.in.v(est.bi$xg, actual.bi$xg);
+    if (length(xover)>1) {
+        act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
+        act.zv <- act.bi.ungridded$grid;
+        act.resid.sq <- get.v.resid.squared(act.zv);
+        return(act.resid.sq)
+    }
+    front.x <- actual.bi$xg[actual.bi$xg<xover[1]];
+    back.x <- actual.bi$xg[actual.bi$xg>xover[length(xover)]];
+    shared.x <- xover;
+    #now have all the shared x values and the outside values in x
+    yover <- only.in.v(est.bi$yg, actual.bi$yg);
+    if (length(yover)>1) {
+        act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
+        act.zv <- act.bi.ungridded$grid;
+        act.resid.sq <- get.v.resid.squared(act.zv);
+        return(act.resid.sq)
+    }
+    top.y <- actual.bi$yg[actual.bi$yg<yover[1]];
+    end.y <- actual.bi$yg[actual.bi$yg>yover[length(yover)]];
+    shared.y <- yover;
+    #now have all the shared y values and the outside values in y
+    est.m <- get.m.from.xy(est.bi$zg, shared.x, shared.y);
+    act.m <- get.m.from.xy(actual.bi$zg, shared.x, shared.y);
+    front.m <- get.m.from.xy(actual.bi$zg, front.x, shared.y);
+    back.m <- get.m.from.xy(actual.bi$zg, back.x, shared.y);
+    top.m <- get.m.from.xy(actual.bi$zg, actual.bi$xg, top.y);
+    end.m <- get.m.from.xy(actual.bi$zg, actual.bi$xg, end.y);
+    #now have all the matrices we need
+    r.sq.tot <- 0;
+    front.mv <- as.vector(front.m);
+    front.r.squared <- get.v.squared(front.mv);
+    r.sq.tot <- r.sq.tot + front.r.squared;
+    #have the r-squared of the FRONT matrix in total
+    back.mv <- as.vector(back.m);
+    back.r.squared <- get.v.squared(back.mv);
+    r.sq.tot <- r.sq.tot + back.r.squared;
+    #have the r-squared of the BACK matrix in total
+    top.mv <- as.vector(top.m);
+    top.r.squared <- get.v.squared(top.mv);
+    r.sq.tot <- r.sq.tot + top.r.squared;
+    #have the r-squared of the TOP matrix in total
+    end.mv <- as.vector(end.m);
+    end.r.squared <- get.v.squared(end.mv);
+    r.sq.tot <- r.sq.tot + end.r.squared;
+    #have the r-squared of the END matrix in total
+    est.mv <- as.vector(est.m);
+    act.mv <- as.vector(act.m);
+    shared.r.squared <- get.r.squared(est.mv, act.mv);
+    r.sq.tot <- r.sq.tot + shared.r.squared;
+    #have the TOTAL r-squared
+    return(r.sq.tot)
 }
 ```
 

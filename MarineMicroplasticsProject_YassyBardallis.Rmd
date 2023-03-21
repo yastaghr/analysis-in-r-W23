@@ -12,6 +12,7 @@ install.packages("oce")
 install.packages("interp")
 library(interp)
 library(oce)
+library(Matrix)
 SEA_MICRO <- read.csv("SEA_MICRO.csv")
 colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 ```
@@ -177,7 +178,17 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
-ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = seq(from = -70.2, to = -56.6, by = 0.1), yg = seq(from = 11, to = 41, by = 0.1), iterations = 1, pregrid = TRUE)
+get.set.gridvals <- function(this.set) {
+    this.r.long <- range(this.set$longitude);
+    this.r.lat <- range(this.set$latitude);
+    edges.long <- signif(this.r.long, 1);
+    edges.lat <- signif(this.r.lat, 1);
+    xg = seq(from = edges.long[1]-1, to = edges.long[2]+1, by = 0.1);
+    yg = seq(from = edges.lat[1]-1, to = edges.lat[2]+1, by = 0.1);
+    return(list("xg" = xg, "yg" = yg))
+}
+ws.1986.gv <- get.set.gridvals(ws.1986)
+ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = ws.1986.gv$xg, yg =  ws.1986.gv$yg, iterations = 1, pregrid = TRUE)
 ```
 
 #### MODEL OUTLINE
@@ -189,6 +200,8 @@ We will determine the error of each model by applying the combinatorial weight f
 We know that the irreducible error in this process will be high due to the aforementioned inconsistency and sparsity of our data, the introduction of an unknown amount of microplastics to the ocean in unknown locations, and the unincorporated affect that ocean currents and meteorological events have on the dispersal of said microplastics. Predicting the affects of these influences would be a potential avenue of future research.
 
 ## MODEL ANALYSIS
+
+### Model Setup
 
 We will be testing three different models: the first model, in which the data points from previous years are equally weighted; the second model, where each successive year has twice the weight of the year before it, and the third model, where the last three years have twice the power of the one before it, and the rest are equally weighted at half of the weight of the last of those three.
 
@@ -204,6 +217,65 @@ model3.recent2last.weights <- rep(1, times = 23)
 model3.recent2last.weights[1] <- 8
 model3.recent2last.weights[2] <- 4
 model3.recent2last.weights[3] <- 2
+gen.full.wv <- function(model.wv, num.years) {
+    end.year <- range.years.ws$End[1];
+    first.sect <- length(workingset.seamicro$times[workingset.seamicro$times<=end.year]);
+    out.wv <- rep(model.wv[num.years], times = first.sect);
+    
+    num = 1;
+    while (num<num.years) {
+        start.year <- range.years.ws$Start[1+num];
+        end.year <- range.years.ws$End[1+num];
+        half.set <- workingset.seamicro$times[workingset.seamicro$times<=end.year];
+        sect.this <- length(half.set[half.set>=start.year]);
+        out.wv <- c(out.wv, rep(model.wv[num.years-num], times = sect.this));
+        num = num + 1;
+    }
+    return(out.wv)
+}
+get.prev.set <- function(num.years) {
+    this.set <- subset(workingset.seamicro, workingset.seamicro$times<=range.years.ws$End[num.years]);
+    return(this.set)
+}
+get.this.set <- function(ind.y) {
+    half.set <- subset(workingset.seamicro, workingset.seamicro$times<=range.years.ws$End[ind.y]);
+    this.set <- subset(half.set, half.set$times>=range.years.ws$Start[ind.y]);
+    return(this.set)
+}
+```
+
+### MODEL 1: EQUAL WEIGHTS
+
+```{r}
+overlap.v <- function(x1, x2) {
+    x1.last <- x1[length(x1)];
+    x1.first <- x1[1];
+    x2.last <- x2[length(x2)];
+    x2.first <- x2[1];
+    new1 <- x1;
+    new2 <- x2;
+    if(x1.last>x2.last) {
+        new1 <- new1[new1<=x2.last];
+    } else if (x1.last<x2.last) {
+        new2 <- new2[new2<=x1.last];
+    } 
+    if(x1.first>x2.first) {
+        new2 <- new2[new2>=x1.first];
+    } else if (x1.first<x2.first) {
+        new1 <- new1[new1>=x2.first];
+    }
+    return(list(new1, new2))
+}
+get.estimate <- function(model.ws, year.index) {
+prev.set <- get.prev.set(year.index-1);
+wv <- gen.full.wv(model.wv = model.ws, num.years = year.index);
+prev.gv <- get.set.gridvals(prev.set);
+pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
+this.set <- get.this.set(year.index);
+this.gv <- get.set.gridvals(this.set);
+actual.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = this.gv$xg, yg = this.gv$yg, iterations = 1);
+
+}
 ```
 
 ## CONCLUSION

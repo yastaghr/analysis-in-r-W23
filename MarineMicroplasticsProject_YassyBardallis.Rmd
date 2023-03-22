@@ -282,16 +282,21 @@ gen.wv.1y <- function(w, year.index) {
     return(wv)
 }
 gen.full.wv <- function(model.wv, num.years) {
+  #debug point! 
+  print("generating the weights");
     full.wv <- NULL;
     #debug point! #debug point! print(num.years);
     num = 1;
     #this starts AT THE OLDEST YEAR INVOLVED because thats what bi needs
     while (num <= num.years) {
-        #debug point! #debug point! print(num);
+        #debug point! #debug point! 
+      print(num);
         this.w <- model.wv[num];
-        #debug point! #debug point! print(this.w);
+        #debug point! #debug point! 
+        print(this.w);
         this.wv <- gen.wv.1y(this.w, num);
-        #debug point! #debug point! print(this.wv);
+        #debug point! #debug point! 
+        print(this.wv);
         if (this.wv[1] != FALSE) {
             #debug point! #debug point! print(length(this.wv));
             full.wv <- c(full.wv, this.wv);
@@ -308,7 +313,9 @@ get.prev.set <- function(num.years) {
 }
 get.this.set <- function(ind.y) {
     half.set <- subset(workingset.seamicro, workingset.seamicro$times<=range.years.ws$End[ind.y]);
+    #debug point! print("if not red above me, not a problem");
     this.set <- subset(half.set, half.set$times>=range.years.ws$Start[ind.y]);
+    #debug point! print("if not red above me, not a problem");
     return(this.set)
 }
 set.bi.dimnames <- function(bi) {
@@ -329,52 +336,36 @@ only.in.v <- function(x1, x2) {
     if (is.null(x)) return(FALSE)
     return(x)
 }
-is.equal.vector <- function(v1, v2) {
-    l <- length(v1);
-    n <- 1;
-    while (n <= l) {
-        if (v1[n] != v2[n]) return(FALSE)
-        n <- n + 1;
-    }
-    return(TRUE)
-}
-combine.sets <- function(set1, set2){
-    names1 <- names(set1);
-    names2 <- names(set2);
-    if (is.null(names1)) {
-        stop("first set is NULL")
-    } else if (is.null(names2)) {
-        stop("second set is NULL")
-    } 
-    vars1 <- length(names1);
-    vars2 <- length(names2);
-    if (vars1 != vars2) {
-        stop("set mismatch: num vars not equal")
-    } else if (is.equal.vector(names2, names1)) {
-        stop("sets mismatch: variable names not equal")
-    } 
-    new.set <- set1;
-    for (var in names1) {
-        new.set$var <- c(set1$var, set2$var);
-    }
-    return(new.set)
+combine.sets.seamicro <- function(set1, set2) {
+    nt <- c(set1$times, set2$times);
+    nlat <- c(set1$latitude, set2$latitude);
+    nlong <- c(set1$longitude, set2$longitude);
+    np <- c(set1$pieces_km2, set2$pieces_km2);
+    nset <- data.frame("times" = nt, "latitude" = nlat, "longitude" = nlong, "pieces_km2" = np);
+    return(nset)
 }
 get.estimate <- function(model.ws, prev.set, year.index) {
     #debug point! print("in get.estimate");
     past.set.length <- length(prev.set$times);
     #prev.set <- c(prev.set, get.this.set(year.index-1));
-    prev.set <- combine.sets(prev.set, get.this.set(year.index-1));
-    if (length(prev.set$times)==past.set.length) {
+    add.set <- get.this.set(year.index-1);
+    #debug point! print("if not red above me, not a problem");
+    if (length(add.set$times)==0) {
+      #debug point! print("can't get the length of a zero year");
       return(list(FALSE, prev.set))
     }
+    prev.set <- combine.sets.seamicro(prev.set, add.set);
     #debug point! print("prev.set");
     wv <- gen.full.wv(model.wv = model.ws, num.years = year.index-1);
-    #debug point! print(length(wv));
+    #debug point! 
+    print(length(wv));
     prev.gv <- get.set.gridvals(prev.set);
     #debug point! print("prev.gv - grid values");
-    #debug point! print(length(prev.gv$xg));
+    #debug point! 
+    print(length(prev.gv$xg));
     #debug point! print(length(prev.gv$yg));
-    #debug point! print(length(prev.set$longitude));
+    #debug point! 
+    print(length(prev.set$longitude));
     #debug point! print(length(prev.set$latitude));
     #debug point! print(length(prev.set$pieces_km2))
     pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
@@ -506,15 +497,16 @@ while (year.index <= length(range.years.ws$End)) {
   print(year.index)
   #debug point! if(year.index>12) stop() year.index <- 12
   past.group <- get.estimate(model1.weights, past.set, year.index)
-  if (past.group[1] == FALSE) {
+  past.bi <- past.group[1]
+  past.set <- past.group[2]
+  if (is.list(past.bi[1])) {
     m1.rsq.v <- c(m1.rsq.v, 0)
     year.index <- year.index + 1
     next
   }
-  past.bi <- past.group[1]
-  past.set <- past.group[2]
   #debug point!
-  #debug point! print("past.bi")
+  #debug point! 
+  print("past.bi")
   past.bi <- set.bi.dimnames(past.bi)
   #debug point!
   #debug point! print("past.bi has names")

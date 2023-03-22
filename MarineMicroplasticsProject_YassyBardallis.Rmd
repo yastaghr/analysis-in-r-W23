@@ -209,17 +209,17 @@ We know that the irreducible error in this process will be high due to the afore
 We will be testing three different models: the first model, in which the data points from previous years are equally weighted; the second model, where each successive year has twice the weight of the year before it, and the third model, where the last three years have twice the power of the one before it, and the rest are equally weighted at half of the weight of the last of those three.
 
 ```{r}
-model1.recent2last.weights <- rep(1, times = 23)
-model2.recent2last.weights <- rep(1, times = 23)
+model1.weights <- rep(1, times = 23)
+model2.weights <- rep(1, times = 23)
 x = 22
 while (x>0) {
-    model2.recent2last.weights[x] <- 2 * model2.recent2last.weights[x+1];
+    model2..weights[x] <- 2 * model2.weights[x+1];
     x = x - 1
 }
-model3.recent2last.weights <- rep(1, times = 23)
-model3.recent2last.weights[1] <- 8
-model3.recent2last.weights[2] <- 4
-model3.recent2last.weights[3] <- 2
+model3.weights <- rep(1, times = 23)
+model3.weights[1] <- 8
+model3.weights[2] <- 4
+model3.weights[3] <- 2
 gen.full.wv <- function(model.wv, num.years) {
     end.year <- range.years.ws$End[1];
     first.sect <- length(workingset.seamicro$times[workingset.seamicro$times<=end.year]);
@@ -382,7 +382,16 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 ### MODEL 1: EQUAL WEIGHTS
 
 ```{r}
-
+m1.rsq.v <- rep(0, times = 23)
+#because the first year has no estimate, it stays a zero
+for (year.index in 2:23) {
+  past.bi <- get.estimate(model1.weights, year.index)
+  past.bi <- set.bi.dimnames(base.bi)
+  now.bi <- get.actual(year.index)
+  now.bi <- set.bi.dimnames(now.bi)
+  now.rsq <- get.r.squared.total(past.bi, now.bi)
+  m1.rsq.v[year.index] <- now.rsq
+}
 ```
 
 ## CONCLUSION

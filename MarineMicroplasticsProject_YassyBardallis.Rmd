@@ -181,17 +181,59 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
+add.tenths2front <- function(front, v) {
+    add.end <- v[1] - 0.1;
+    add.buff <- -0.1 * (front - 1);
+    add.start <- add.end + add.buff;
+    f.v <- seq(from = add.start, to = add.end, by = 0.1);
+    #debug point! return(f.v)
+    v2 <- c(f.v, v);
+    return(v2)
+}
+add.tenths2back <- function(back, v) {
+    add.start <- v[length(v)] + 0.1;
+    add.buff <- 0.1 * (back - 1);
+    add.end <- add.start + add.buff;
+    b.v <- seq(from = add.start, to = add.end, by = 0.1);
+    v2 <- c(v, b.v);
+    return(v2)
+}
+add.enough.tenths <- function(more, v) {
+    if (more%%2 != 0) {
+        v <- c(v[1]-0.1, v);
+        more <- more - 1;
+    }
+    #now is not odd
+    add.half <- more/2;
+    
+}
 get.set.gridvals <- function(this.set) {
     this.r.long <- range(this.set$longitude);
     this.r.lat <- range(this.set$latitude);
-    edges.long <- signif(this.r.long, 1);
-    edges.lat <- signif(this.r.lat, 1);
-    xg = seq(from = edges.long[1]-1, to = edges.long[2]+1, by = 0.1);
-    yg = seq(from = edges.lat[1]-1, to = edges.lat[2]+1, by = 0.1);
+    this.r.long[1] <- floor(this.r.long[1]);
+    this.r.lat[1] <- floor(this.r.lat[1]);
+    this.r.long[2] <- ceiling(this.r.long[2]);
+    this.r.lat[2] <- ceiling(this.r.lat[2]);
+    #now all coords should be included
+    xg = seq(from = this.r.long[1], to = this.r.long[2], by = 0.1);
+    yg = seq(from = this.r.lat[1], to = this.r.lat[2], by = 0.1);
+    #everything is by tenths now
+    mod.xg <- length(xg)%%length(this.set$longitude);
+    mod.yg <- length(yg)%%length(this.set$latitude);
+    if (mod.xg != 0) {
+        #the grid does not divide into the coords and it doesn't like this
+        needed <- length(this.set$longitude) - mod.xg;
+        xg <- add.enough.tenths(needed, xg);
+    }
+    if (length(yg)%%length(this.set$latitude) != 0) {
+        #the grid does not divide into the coords and it doesn't like this
+        needed <- length(this.set$latitude) - mod.yg;
+        yg <- add.enough.tenths(needed, yg);
+    }
     return(list("xg" = xg, "yg" = yg))
 }
 ws.1986.gv <- get.set.gridvals(ws.1986)
-ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = ws.1986.gv$xg, yg =  ws.1986.gv$yg, iterations = 1, pregrid = TRUE)
+ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = ws.1986.gv$xg, yg =  ws.1986.gv$yg, iterations = 1)
 ```
 
 #### MODEL OUTLINE
@@ -213,28 +255,29 @@ model1.weights <- rep(1, times = 23)
 model2.weights <- rep(1, times = 23)
 x = 22
 while (x>0) {
-    model2..weights[x] <- 2 * model2.weights[x+1];
+    model2.weights[x] <- 2 * model2.weights[x+1];
     x = x - 1
 }
 model3.weights <- rep(1, times = 23)
 model3.weights[1] <- 8
 model3.weights[2] <- 4
 model3.weights[3] <- 2
-gen.full.wv <- function(model.wv, num.years) {
-    end.year <- range.years.ws$End[1];
-    first.sect <- length(workingset.seamicro$times[workingset.seamicro$times<=end.year]);
-    out.wv <- rep(model.wv[num.years], times = first.sect);
-    
-    num = 1;
-    while (num<num.years) {
-        start.year <- range.years.ws$Start[1+num];
-        end.year <- range.years.ws$End[1+num];
-        half.set <- workingset.seamicro$times[workingset.seamicro$times<=end.year];
-        sect.this <- length(half.set[half.set>=start.year]);
-        out.wv <- c(out.wv, rep(model.wv[num.years-num], times = sect.this));
-        num = num + 1;
+gen.wv.1y <- function(w, year.index) {
+    end <- range.years.ws$End[year.index];
+    s <- range.years.ws$Start[year.index];
+    bef.end <- workingset.seamicro$times[workingset.seamicro$times <= end];
+    year.times <- bef.end[bef.end >= s];
+    years <- length(year.times);
+    #have list of times this year
+    if (years<1) {
+        return(FALSE)
+        #no times that year
     }
-    return(out.wv)
+    wv <- rep(w, years);
+    return(wv)
+}
+gen.full.wv <- function(model.wv, num.years) {
+    
 }
 get.prev.set <- function(num.years) {
     this.set <- subset(workingset.seamicro, workingset.seamicro$times<=range.years.ws$End[num.years]);
@@ -264,10 +307,16 @@ only.in.v <- function(x1, x2) {
     return(x)
 }
 get.estimate <- function(model.ws, year.index) {
+    print("in get.estimate");
     prev.set <- get.prev.set(year.index-1);
+    print("prev.set");
     wv <- gen.full.wv(model.wv = model.ws, num.years = year.index);
+    print(wv);
     prev.gv <- get.set.gridvals(prev.set);
+    print("prev.gv - grid values");
+    print(prev.gv);
     pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
+    print("pred.bi");
     return(pred.bi)
 }
 get.actual <- function(year.index) {
@@ -328,7 +377,7 @@ get.r.squared.total <- function(est.bi, actual.bi) {
     if (length(xover)>1) {
         act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
         act.zv <- act.bi.ungridded$grid;
-        act.resid.sq <- get.v.resid.squared(act.zv);
+        act.resid.sq <- get.v.squared(act.zv);
         return(act.resid.sq)
     }
     front.x <- actual.bi$xg[actual.bi$xg<xover[1]];
@@ -339,7 +388,7 @@ get.r.squared.total <- function(est.bi, actual.bi) {
     if (length(yover)>1) {
         act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
         act.zv <- act.bi.ungridded$grid;
-        act.resid.sq <- get.v.resid.squared(act.zv);
+        act.resid.sq <- get.v.squared(act.zv);
         return(act.resid.sq)
     }
     top.y <- actual.bi$yg[actual.bi$yg<yover[1]];
@@ -385,11 +434,17 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 m1.rsq.v <- rep(0, times = 23)
 #because the first year has no estimate, it stays a zero
 for (year.index in 2:23) {
+  print(year.index)
   past.bi <- get.estimate(model1.weights, year.index)
-  past.bi <- set.bi.dimnames(base.bi)
+  print("past.bi")
+  past.bi <- set.bi.dimnames(past.bi)
+  print("past.bi has names")
   now.bi <- get.actual(year.index)
+  print("now.bi")
   now.bi <- set.bi.dimnames(now.bi)
+  print("now.bi has names")
   now.rsq <- get.r.squared.total(past.bi, now.bi)
+  print(now.rsq)
   m1.rsq.v[year.index] <- now.rsq
 }
 ```

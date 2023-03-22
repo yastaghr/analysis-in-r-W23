@@ -43,17 +43,17 @@ This lead us to a problem, as analysis using the `ts()` data format is intended 
 ```{r}
 ts.dates.sea_micro <- ts(data = SEA_MICRO$times)
 uniq.dates.seamicro <- unique(ts.dates.sea_micro)
-print("Number of distinct dates on which samples were taken:")
+#debug point! print("Number of distinct dates on which samples were taken:")
 distinct.dates.seamicro <- length(uniq.dates.seamicro)
 distinct.dates.seamicro
-print("Maximum gap between data points:")
+#debug point! print("Maximum gap between data points:")
 spacing.dates.seamicro <- diff(as.Date(SEA_MICRO$times))
 gap.max.dates.seamicro <- max(spacing.dates.seamicro)
 gap.max.dates.seamicro
-print("Number of data points with a shared date:")
+#debug point! print("Number of data points with a shared date:")
 dup.date.seamicro <- SEA_MICRO$times[duplicated(SEA_MICRO$times)]
 length(dup.date.seamicro)
-print("Number of dates with multiple data points:")
+#debug point! print("Number of dates with multiple data points:")
 uniq.dup.date.seamicro <- unique(dup.date.seamicro)
 length(uniq.dup.date.seamicro)
 ```
@@ -182,6 +182,7 @@ colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
 add.tenths2front <- function(front, v) {
+    front <- abs(front);
     add.end <- v[1] - 0.1;
     add.buff <- -0.1 * (front - 1);
     add.start <- add.end + add.buff;
@@ -191,6 +192,7 @@ add.tenths2front <- function(front, v) {
     return(v2)
 }
 add.tenths2back <- function(back, v) {
+    back <- abs(back);
     add.start <- v[length(v)] + 0.1;
     add.buff <- 0.1 * (back - 1);
     add.end <- add.start + add.buff;
@@ -205,7 +207,10 @@ add.enough.tenths <- function(more, v) {
     }
     #now is not odd
     add.half <- more/2;
-    
+    v <- add.tenths2back(add.half, v);
+    v <- add.tenths2front(add.half, v);
+    #debug point! return(length(v))
+    return(v)
 }
 get.set.gridvals <- function(this.set) {
     this.r.long <- range(this.set$longitude);
@@ -277,7 +282,25 @@ gen.wv.1y <- function(w, year.index) {
     return(wv)
 }
 gen.full.wv <- function(model.wv, num.years) {
-    
+    full.wv <- NULL;
+    #debug point! #debug point! print(num.years);
+    num = 1;
+    #this starts AT THE OLDEST YEAR INVOLVED because thats what bi needs
+    while (num <= num.years) {
+        #debug point! #debug point! print(num);
+        this.w <- model.wv[num];
+        #debug point! #debug point! print(this.w);
+        this.wv <- gen.wv.1y(this.w, num);
+        #debug point! #debug point! print(this.wv);
+        if (this.wv[1] != FALSE) {
+            #debug point! #debug point! print(length(this.wv));
+            full.wv <- c(full.wv, this.wv);
+        }
+        num = num + 1;
+    }
+    #debug point! #debug point! print("out of loop");
+    #debug point! #debug point! print(length(full.wv));
+    return(full.wv)
 }
 get.prev.set <- function(num.years) {
     this.set <- subset(workingset.seamicro, workingset.seamicro$times<=range.years.ws$End[num.years]);
@@ -306,18 +329,57 @@ only.in.v <- function(x1, x2) {
     if (is.null(x)) return(FALSE)
     return(x)
 }
-get.estimate <- function(model.ws, year.index) {
-    print("in get.estimate");
-    prev.set <- get.prev.set(year.index-1);
-    print("prev.set");
-    wv <- gen.full.wv(model.wv = model.ws, num.years = year.index);
-    print(wv);
+is.equal.vector <- function(v1, v2) {
+    l <- length(v1);
+    n <- 1;
+    while (n <= l) {
+        if (v1[n] != v2[n]) return(FALSE)
+        n <- n + 1;
+    }
+    return(TRUE)
+}
+combine.sets <- function(set1, set2){
+    names1 <- names(set1);
+    names2 <- names(set2);
+    if (is.null(names1)) {
+        stop("first set is NULL")
+    } else if (is.null(names2)) {
+        stop("second set is NULL")
+    } 
+    vars1 <- length(names1);
+    vars2 <- length(names2);
+    if (vars1 != vars2) {
+        stop("set mismatch: num vars not equal")
+    } else if (is.equal.vector(names2, names1)) {
+        stop("sets mismatch: variable names not equal")
+    } 
+    new.set <- set1;
+    for (var in names1) {
+        new.set$var <- c(set1$var, set2$var);
+    }
+    return(new.set)
+}
+get.estimate <- function(model.ws, prev.set, year.index) {
+    #debug point! print("in get.estimate");
+    past.set.length <- length(prev.set$times);
+    #prev.set <- c(prev.set, get.this.set(year.index-1));
+    prev.set <- combine.sets(prev.set, get.this.set(year.index-1));
+    if (length(prev.set$times)==past.set.length) {
+      return(list(FALSE, prev.set))
+    }
+    #debug point! print("prev.set");
+    wv <- gen.full.wv(model.wv = model.ws, num.years = year.index-1);
+    #debug point! print(length(wv));
     prev.gv <- get.set.gridvals(prev.set);
-    print("prev.gv - grid values");
-    print(prev.gv);
+    #debug point! print("prev.gv - grid values");
+    #debug point! print(length(prev.gv$xg));
+    #debug point! print(length(prev.gv$yg));
+    #debug point! print(length(prev.set$longitude));
+    #debug point! print(length(prev.set$latitude));
+    #debug point! print(length(prev.set$pieces_km2))
     pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
-    print("pred.bi");
-    return(pred.bi)
+    #debug point! print("pred.bi");
+    return(list(pred.bi, prev.set))
 }
 get.actual <- function(year.index) {
     half.set <- subset(workingset.seamicro, workingset.seamicro$times>=range.years.ws$Start[year.index]);
@@ -373,9 +435,12 @@ get.m.from.xy <- function(m, x, y) {
     return(new.m)
 }
 get.r.squared.total <- function(est.bi, actual.bi) {
+    if (length(actual.bi$xg)==0) return(0)
     xover <- only.in.v(est.bi$xg, actual.bi$xg);
-    if (length(xover)>1) {
+    #debug point! print(xover);
+    if (xover[1] == FALSE) {
         act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
+        #debug point! print(length(act.bi.ungridded$grid));
         act.zv <- act.bi.ungridded$grid;
         act.resid.sq <- get.v.squared(act.zv);
         return(act.resid.sq)
@@ -385,7 +450,7 @@ get.r.squared.total <- function(est.bi, actual.bi) {
     shared.x <- xover;
     #now have all the shared x values and the outside values in x
     yover <- only.in.v(est.bi$yg, actual.bi$yg);
-    if (length(yover)>1) {
+    if (yover[1] == FALSE) {
         act.bi.ungridded <- ungrid(actual.bi$xg, actual.bi$yg, actual.bi$zg);
         act.zv <- act.bi.ungridded$grid;
         act.resid.sq <- get.v.squared(act.zv);
@@ -431,22 +496,42 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 ### MODEL 1: EQUAL WEIGHTS
 
 ```{r}
-m1.rsq.v <- rep(0, times = 23)
+m1.rsq.v <- 0;
 #because the first year has no estimate, it stays a zero
-for (year.index in 2:23) {
+year.index <- 2
+past.set <- get.this.set(1)
+while (year.index <= length(range.years.ws$End)) {
+  #debug point!
+  #debug point! 
   print(year.index)
-  past.bi <- get.estimate(model1.weights, year.index)
-  print("past.bi")
+  #debug point! if(year.index>12) stop() year.index <- 12
+  past.group <- get.estimate(model1.weights, past.set, year.index)
+  if (past.group[1] == FALSE) {
+    m1.rsq.v <- c(m1.rsq.v, 0)
+    year.index <- year.index + 1
+    next
+  }
+  past.bi <- past.group[1]
+  past.set <- past.group[2]
+  #debug point!
+  #debug point! print("past.bi")
   past.bi <- set.bi.dimnames(past.bi)
-  print("past.bi has names")
+  #debug point!
+  #debug point! print("past.bi has names")
   now.bi <- get.actual(year.index)
-  print("now.bi")
+  #debug point!
+  #debug point! print("now.bi")
   now.bi <- set.bi.dimnames(now.bi)
-  print("now.bi has names")
+  #debug point!
+  #debug point! print("now.bi has names")
   now.rsq <- get.r.squared.total(past.bi, now.bi)
+  #debug point!
+  #debug point! 
   print(now.rsq)
-  m1.rsq.v[year.index] <- now.rsq
+  m1.rsq.v <- c(m1.rsq.v, now.rsq)
+  year.index <- year.index + 1
 }
+print(m1.rsq.v)
 ```
 
 ## CONCLUSION

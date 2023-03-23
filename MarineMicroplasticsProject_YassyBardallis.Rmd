@@ -8,11 +8,10 @@ bibliography: references.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-install.packages("oce")
-install.packages("interp")
-library(interp)
-library(oce)
-library(Matrix)
+library.dynam(interp)
+library.dynam(oce)
+library.dynam(Matrix)
+library.dynam(knitr)
 SEA_MICRO <- read.csv("SEA_MICRO.csv")
 colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 ```
@@ -35,7 +34,7 @@ We did not preprocess this data in any way; however, it may or may not have unde
 A sample of the observations contained within the dataset shows that there exist within it multiple sets of observations taken on the same day at different locations across the globe.
 
 ```{r}
-knitr::kable(SEA_MICRO[1:16,], caption = "Entries 1-16 of the SEA_MICRO Dataset")
+knitr::kable(SEA_MICRO[1:16,], format = "pipe", caption = "Entries 1-16 of the SEA_MICRO Dataset")
 ```
 
 This lead us to a problem, as analysis using the `ts()` data format is intended to be done with univariate data which is equally spaced in time. However, it was a useful format for discovering enough basic statistics about this dataset to determine a better format for our analysis. These facts can be seen below.
@@ -43,17 +42,17 @@ This lead us to a problem, as analysis using the `ts()` data format is intended 
 ```{r}
 ts.dates.sea_micro <- ts(data = SEA_MICRO$times)
 uniq.dates.seamicro <- unique(ts.dates.sea_micro)
-#debug point! print("Number of distinct dates on which samples were taken:")
+print("Number of distinct dates on which samples were taken:")
 distinct.dates.seamicro <- length(uniq.dates.seamicro)
 distinct.dates.seamicro
-#debug point! print("Maximum gap between data points:")
+print("Maximum gap between data points:")
 spacing.dates.seamicro <- diff(as.Date(SEA_MICRO$times))
 gap.max.dates.seamicro <- max(spacing.dates.seamicro)
 gap.max.dates.seamicro
-#debug point! print("Number of data points with a shared date:")
+print("Number of data points with a shared date:")
 dup.date.seamicro <- SEA_MICRO$times[duplicated(SEA_MICRO$times)]
 length(dup.date.seamicro)
-#debug point! print("Number of dates with multiple data points:")
+print("Number of dates with multiple data points:")
 uniq.dup.date.seamicro <- unique(dup.date.seamicro)
 length(uniq.dup.date.seamicro)
 ```
@@ -107,10 +106,13 @@ legend(x = "topleft", legend = c("Q3", "MEAN", "Q1", "CHOSEN"), fill = c("blue",
 
 ##### LONGITUDE
 
+```{r}
+summary(set.longlat)
+```
+
 Using the set of observations that were determined above, we repeated a similar process with the longitudinal values. We used the median, in this case, because the mean was outside of the needed range. In this case, we eventually arrived at a boundary point at -95 degrees, also known as 95 degrees west.
 
 ```{r}
-summary(set.longlat)
 Q1.set.longlat <- subset(set.longlat, set.longlat$longitude>=-82)
 median.set.longlat <- subset(set.longlat, set.longlat$longitude>=-71)
 Q3.set.longlat <- subset(set.longlat, set.longlat$longitude>=-65)
@@ -175,7 +177,7 @@ Our intended model does not have separate response and predictor variables; rath
 
 Because of the circumstantial limitations imposed by this dataset, we will be analyzing a model which combines the microplastic density data from past years to estimate the interpolated density of a future year. This model is analogous to a linear regression model; however, rather than a training set and a test set, we have the set of past values and the future values given by the data set.
 
-```{r}
+```{r echo=FALSE}
 labels.years.ws <- seq(from = 1986, to = 2008, by = 1)
 range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = as.POSIXct("2008-01-01", tz = ""), by = "year"), seq(from = as.POSIXct("1986-12-31", tz = ""), to = as.POSIXct("2008-12-31", tz = ""), by = "year"))
 colnames(range.years.ws) <- c("Start", "End")
@@ -402,7 +404,7 @@ We know that the irreducible error in this process will be high due to the afore
 
 We will be testing three different models: the first model, in which the data points from previous years are equally weighted; the second model, where each successive year has twice the weight of the year before it, and the third model, where the last three years have twice the power of the one before it, and the rest are equally weighted at half of the weight of the last of those three.
 
-```{r}
+```{r echo=FALSE}
 model1.weights <- rep(1, times = 23)
 model2.weights <- rep(1, times = 23)
 x = 22
@@ -596,14 +598,12 @@ get.actual <- function(year.index) {
         zd <- rep(0, times = x);
         return(list("xg" = gv$xg, "yg" = gv$yg, "zg" = zg, "wg" = wg, "zd" = zd));
     }
-    #debug point! 
-    print("get.actual: next is gridvals");
+    #debug point! print("get.actual: next is gridvals");
     gv <- get.set.gridvals(this.set);
     if (is.logical(gv)) {
         return(FALSE)
       }
-    #debug point! 
-    print("get.actual: gridvals done, next is ib");
+    #debug point! print("get.actual: gridvals done, next is ib");
     this.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = gv$xg, yg = gv$yg, iterations = 1);
     return(this.bi);
 }
@@ -705,55 +705,74 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 
 ### MODEL 1: EQUAL WEIGHTS
 
-```{r}
-m1.rsq.v <- 0
+```{r echo=FALSE}
+run.this.model <- function(model.num) {
+  mw <- 0;
+  if (!is.numeric(model.num)) {
+    stop("That is not a number, friend. I can't work with something that isn't a number.")
+  } else if (model.num < 1) {
+    stop("You gave me a model number that doesn't exist, friend. I can't do anything with that.")
+  } else if (model.num > 3) {
+    stop("You gave me a model number that doesn't exist, friend. I can't do anything with that.")
+  } else if (model.num == 1) {
+    mw <- model1.weights;
+  } else if (model.num == 2) {
+    mw <- model2.weights;
+  } else if (model.num == 3) {
+    mw <- model3.weights;
+  }
+m.rsq.v <- 0
 #because the first year has no estimate, it stays a zero
 year.index <- 2
 past.set <- get.this.set(1)
 end.num <- length(range.years.ws$End) + 1
 while (year.index < end.num) {
-  #debug point!
-  print("Hi! I'm year:")
-  #debug point! 
-  print(year.index)
+  #debug point! print("Hi! I'm year:")
+  #debug point! print(year.index)
   #debug point! if(year.index>12) stop() year.index <- 12
-  past.group <- get.estimate(model1.weights, past.set, year.index - 1)
+  past.group <- get.estimate(mw, past.set, year.index - 1)
   past.bi <- past.group[1]
   past.set <- past.group[2]
   if (is.logical(past.set)) {
-    m1.rsq.v <- c(m1.rsq.v, 0)
+    m.rsq.v <- c(m.rsq.v, 0)
     year.index <- year.index + 1
     next
   } else if (is.logical(past.bi)) {
-    m1.rsq.v <- c(m1.rsq.v, 0)
+    m.rsq.v <- c(m.rsq.v, 0)
     year.index <- year.index + 1
     next
   }
   #debug point! print("past.bi")
   past.bi <- set.bi.dimnames(past.bi)
-  #debug point!
-  #debug point! 
-  print("past.bi has names")
+  #debug point! print("past.bi has names")
   now.bi <- get.actual(year.index)
   if (is.logical(now.bi)) {
-    m1.rsq.v <- c(m1.rsq.v, 0)
+    m.rsq.v <- c(m.rsq.v, 0)
     year.index <- year.index + 1
     next
   }
-  #debug point!
-  #debug point! 
-  print("now.bi")
+  #debug point! print("now.bi")
   now.bi <- set.bi.dimnames(now.bi)
   #debug point!
   #debug point! print("now.bi has names")
   now.rsq <- get.r.squared.total(past.bi, now.bi)
-  #debug point!
-  #debug point! 
-  print(now.rsq)
-  m1.rsq.v <- c(m1.rsq.v, now.rsq)
+  #debug point! print(now.rsq)
+  m.rsq.v <- c(m.rsq.v, now.rsq)
   year.index <- year.index + 1
 }
-print(m1.rsq.v)
+return(m.rsq.v)
+}
+results <- data.frame("years"=labels.years.ws, row.names = labels.years.ws)
+model.nums <- c(1:3)
+model.col.names <- labels.years.ws
+for (n in model.nums) {
+  model.str <- paste("Model.Number", as.character(n), sep = ".")
+  results$str <- run.this.model(n)
+  model.col.names <- c(model.col.names, model.str)
+  names(results) <- model.col.names
+}
+results <- subset(results, select = -years)
+kable(results, format = "pipe", caption = "RSS values for Three Weight-differentiated Models")
 ```
 
 ## CONCLUSION

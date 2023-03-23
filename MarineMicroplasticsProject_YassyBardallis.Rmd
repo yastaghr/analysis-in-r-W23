@@ -181,12 +181,19 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
+incr.by <- function(start, end, by) {
+    #check is right vals
+    #sep into negs, 0, pos
+    #incr as appropos
+    #recombine
+    #return
+}
 add.tenths2front <- function(front, v) {
     front <- abs(front);
     add.end <- v[1] - 0.1;
     add.buff <- -0.1 * (front - 1);
     add.start <- add.end + add.buff;
-    f.v <- seq(from = add.start, to = add.end, by = 0.1);
+    f.v <- incr.by(add.start, add.end, 0.1);
     #debug point! return(f.v)
     v2 <- c(f.v, v);
     return(v2)
@@ -196,7 +203,7 @@ add.tenths2back <- function(back, v) {
     add.start <- v[length(v)] + 0.1;
     add.buff <- 0.1 * (back - 1);
     add.end <- add.start + add.buff;
-    b.v <- seq(from = add.start, to = add.end, by = 0.1);
+    b.v <- incr.by(add.start, add.end, 0.1);
     v2 <- c(v, b.v);
     return(v2)
 }
@@ -220,8 +227,8 @@ get.set.gridvals <- function(this.set) {
     this.r.long[2] <- ceiling(this.r.long[2]);
     this.r.lat[2] <- ceiling(this.r.lat[2]);
     #now all coords should be included
-    xg = seq(from = this.r.long[1], to = this.r.long[2], by = 0.1);
-    yg = seq(from = this.r.lat[1], to = this.r.lat[2], by = 0.1);
+    xg <- incr.by(this.r.long[1], this.r.long[2], 0.1);
+    yg <- incr.by(this.r.lat[1], this.r.lat[2], 0.1);
     #everything is by tenths now
     mod.xg <- length(xg)%%length(this.set$longitude);
     mod.yg <- length(yg)%%length(this.set$latitude);
@@ -267,6 +274,40 @@ model3.weights <- rep(1, times = 23)
 model3.weights[1] <- 8
 model3.weights[2] <- 4
 model3.weights[3] <- 2
+get.times <- function(year.index, all.times) {
+    tv <- all.times;
+    if (is.null(tv)) {
+        return(FALSE)
+    } 
+    tl <- length(all.times);
+    if (tl < 1) {
+        tv <- workingset.seamicro$times;
+    } else if (tl == 1) {
+        if (is.logical(tv)) {
+            return(FALSE)
+        } else if (is.numeric(tv)) {
+            return(FALSE)
+        } else if (is.character(tv)) {
+            return(FALSE)
+        } else if (as.POSIXct(tv)<range.years.ws$Start[1]) {
+            return(FALSE)
+        }
+        return(tv)
+    }
+    if (year.index < 1) {
+        return(FALSE)
+    } else if (year.index > 23) {
+        return(FALSE)
+    }
+    s <- range.years.ws$Start[year.index];
+    e <- range.years.ws$End[year.index];
+    sv <- tv[tv <= e];
+    ntv <- sv[sv >= s];
+    if (length(ntv)<1) {
+        return(FALSE)
+    }
+    return(ntv)
+}
 gen.wv.1y <- function(w, times) {
     years <- length(times);
     if (years<1) {
@@ -274,51 +315,42 @@ gen.wv.1y <- function(w, times) {
         #no times that year
     }
     wv <- rep(w, years);
-    #debug point!
-    print(length(times)==length(wv));
+    #debug point! print(length(times)==length(wv));
     return(wv)
 }
 gen.full.wv <- function(model.wv, times, year.index) {
   num.years <- length(times);
-  #debug point! 
-  print("generating the weights");
+  #debug point! print("generating the weights");
     full.wv <- NULL;
     #debug point! #debug point! print(num.years);
     num = 1;
     #this starts AT THE OLDEST YEAR INVOLVED because thats what bi needs
     end.num <- year.index;
     while (num < end.num) {
-        #debug point! 
-      print("get weight of year:")
-      #debug point! 
-      print(num);
+        #debug point! print("get weight of year:")
+      #debug point! print(num);
         this.w <- model.wv[num];
         #debug point! print("this is that weight");
       #debug point! print(this.w);
-      end.of.year <- range.years.ws$End[num];
-      start.of.year <- range.years.ws$Start[num];
-      ind.start <- length(times[times<=start.of.year]);
-      times.v2 <- times[1:ind.start];
-      ind.end <- length(times.v2[times.v2<=end.of.year]);
-      this.times <- times.v2[1:ind.end];
+      this.times <- get.times(num, times);
+      if (is.logical(this.times)) {
+        num <- num + 1;
+        next
+      }
       #debug point! print("number of events that year == ind in that?");
       #debug point! print(length(this.times)== ind.end-ind.start);
       #debug point! print(length(this.times));
         this.wv <- gen.wv.1y(this.w, this.times);
-        #debug point! 
-      print("Here's the first weight vector");
-      #debug point! 
-        print(this.wv);
-        if (this.wv[1] != FALSE) {
+        #debug point! print("Here's the first weight vector");
+      #debug point! print(this.wv);
+        if (!is.logical(this.wv)) {
           #debug point! print("if the above was false, this is bad");
-          #debug point! 
-          print(length(this.wv));
-            full.wv <- c(full.wv, this.wv);
+          #debug point! print(length(this.wv));
+          full.wv <- c(full.wv, this.wv);
         }
         num <- num + 1;
     }
-    #debug point! #debug point! 
-    print("out of loop");
+    #debug point! #debug point! print("out of loop");
     #debug point! #debug point! print(length(full.wv));
     return(full.wv)
 }
@@ -369,33 +401,27 @@ combine.sets.seamicro <- function(set1, set2) {
     return(nset)
 }
 get.estimate <- function(model.ws, prev.set, year.index) {
-    #debug point! 
-  print("in get.estimate");
+    #debug point! print("in get.estimate");
     past.set.length <- length(prev.set$times);
     add.set <- get.this.set(year.index-1);
     #debug point! print("if not red above me, not a problem");
     if (is.logical(add.set)) {
       return(list(FALSE, prev.set))
-    } else if (length(add.set$times)==0) {
+    }
+    add.set.length <- length(add.set$times);
+    if (add.set.length==0) {
       #debug point! print("can't get the length of zero year");
       return(list(FALSE, prev.set))
-    } 
-    prev.set <- combine.sets.seamicro(prev.set, add.set);
-    if (length(prev.set$times)==past.set.length) {
-      return(list(FALSE, prev.set))
     }
+    prev.set <- combine.sets.seamicro(prev.set, add.set);
     #debug point! print("prev.set");
     wv <- gen.full.wv(model.wv = model.ws, prev.set$times, year.index); 
-    #debug point! 
-    print(length(wv));
+    #debug point! print(length(wv));
     prev.gv <- get.set.gridvals(prev.set);
-    #debug point! 
-    print("prev.gv - grid values");
-    #debug point! 
-    print(length(prev.gv$xg));
+    #debug point! print("prev.gv - grid values");
+    #debug point! print(length(prev.gv$xg));
     #debug point! print(length(prev.gv$yg));
-    #debug point! 
-    print(length(prev.set$longitude));
+    #debug point! print(length(prev.set$longitude));
     #debug point! print(length(prev.set$latitude));
     #debug point! print(length(prev.set$pieces_km2))
     pred.bi <- interpBarnes(x = prev.set$longitude, y = prev.set$latitude, z = prev.set$pieces_km2, w = wv, xg = prev.gv$xg, yg = prev.gv$yg, iterations = 1);
@@ -403,9 +429,16 @@ get.estimate <- function(model.ws, prev.set, year.index) {
     return(list(pred.bi, prev.set))
 }
 get.actual <- function(year.index) {
-    half.set <- subset(workingset.seamicro, workingset.seamicro$times>=range.years.ws$Start[year.index]);
-    this.set <- subset(half.set, half.set$times<=range.years.ws$End[year.index]);
-    if(length(this.set$times)<=0) {
+    this.set <- get.this.set(year.index);
+    if (is.logical(this.set)) {
+      gv <- get.set.gridvals(workingset.seamicro);
+        x <- length(gv$xg);
+        y <- length(gv$yg);
+        wg <- Matrix(data = rep(0, times = x*y), ncol = x, nrow = y);
+        zg <- wg;
+        zd <- rep(0, times = x);
+        return(list("xg" = gv$xg, "yg" = gv$yg, "zg" = zg, "wg" = wg, "zd" = zd));
+    } else if (length(this.set$times)<=0) {
         gv <- get.set.gridvals(workingset.seamicro);
         x <- length(gv$xg);
         y <- length(gv$yg);
@@ -414,7 +447,11 @@ get.actual <- function(year.index) {
         zd <- rep(0, times = x);
         return(list("xg" = gv$xg, "yg" = gv$yg, "zg" = zg, "wg" = wg, "zd" = zd));
     }
+    #debug point! 
+    print("get.actual: next is gridvals");
     gv <- get.set.gridvals(this.set);
+    #debug point! 
+    print("get.actual: gridvals done, next is ib");
     this.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = gv$xg, yg = gv$yg, iterations = 1);
     return(this.bi);
 }
@@ -531,20 +568,29 @@ while (year.index < end.num) {
   past.group <- get.estimate(model1.weights, past.set, year.index - 1)
   past.bi <- past.group[1]
   past.set <- past.group[2]
-  if (is.list(past.bi[1])) {
+  if (is.logical(past.set)) {
+    m1.rsq.v <- c(m1.rsq.v, 0)
+    year.index <- year.index + 1
+    next
+  } else if (is.logical(past.bi)) {
+    m1.rsq.v <- c(m1.rsq.v, 0)
+    year.index <- year.index + 1
+    next
+  }
+  #debug point! print("past.bi")
+  past.bi <- set.bi.dimnames(past.bi)
+  #debug point!
+  #debug point! 
+  print("past.bi has names")
+  now.bi <- get.actual(year.index)
+  if (is.logical(now.bi)) {
     m1.rsq.v <- c(m1.rsq.v, 0)
     year.index <- year.index + 1
     next
   }
   #debug point!
   #debug point! 
-  print("past.bi")
-  past.bi <- set.bi.dimnames(past.bi)
-  #debug point!
-  #debug point! print("past.bi has names")
-  now.bi <- get.actual(year.index)
-  #debug point!
-  #debug point! print("now.bi")
+  print("now.bi")
   now.bi <- set.bi.dimnames(now.bi)
   #debug point!
   #debug point! print("now.bi has names")

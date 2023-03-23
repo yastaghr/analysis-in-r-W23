@@ -267,43 +267,58 @@ model3.weights <- rep(1, times = 23)
 model3.weights[1] <- 8
 model3.weights[2] <- 4
 model3.weights[3] <- 2
-gen.wv.1y <- function(w, year.index) {
-    end <- range.years.ws$End[year.index];
-    s <- range.years.ws$Start[year.index];
-    bef.end <- workingset.seamicro$times[workingset.seamicro$times <= end];
-    year.times <- bef.end[bef.end >= s];
-    years <- length(year.times);
-    #have list of times this year
+gen.wv.1y <- function(w, times) {
+    years <- length(times);
     if (years<1) {
         return(FALSE)
         #no times that year
     }
     wv <- rep(w, years);
+    #debug point!
+    print(length(times)==length(wv));
     return(wv)
 }
-gen.full.wv <- function(model.wv, num.years) {
+gen.full.wv <- function(model.wv, times, year.index) {
+  num.years <- length(times);
   #debug point! 
   print("generating the weights");
     full.wv <- NULL;
     #debug point! #debug point! print(num.years);
     num = 1;
     #this starts AT THE OLDEST YEAR INVOLVED because thats what bi needs
-    while (num <= num.years) {
-        #debug point! #debug point! 
+    end.num <- year.index;
+    while (num < end.num) {
+        #debug point! 
+      print("get weight of year:")
+      #debug point! 
       print(num);
         this.w <- model.wv[num];
-        #debug point! #debug point! 
-        print(this.w);
-        this.wv <- gen.wv.1y(this.w, num);
-        #debug point! #debug point! 
+        #debug point! print("this is that weight");
+      #debug point! print(this.w);
+      end.of.year <- range.years.ws$End[num];
+      start.of.year <- range.years.ws$Start[num];
+      ind.start <- length(times[times<=start.of.year]);
+      times.v2 <- times[1:ind.start];
+      ind.end <- length(times.v2[times.v2<=end.of.year]);
+      this.times <- times.v2[1:ind.end];
+      #debug point! print("number of events that year == ind in that?");
+      #debug point! print(length(this.times)== ind.end-ind.start);
+      #debug point! print(length(this.times));
+        this.wv <- gen.wv.1y(this.w, this.times);
+        #debug point! 
+      print("Here's the first weight vector");
+      #debug point! 
         print(this.wv);
         if (this.wv[1] != FALSE) {
-            #debug point! #debug point! print(length(this.wv));
+          #debug point! print("if the above was false, this is bad");
+          #debug point! 
+          print(length(this.wv));
             full.wv <- c(full.wv, this.wv);
         }
-        num = num + 1;
+        num <- num + 1;
     }
-    #debug point! #debug point! print("out of loop");
+    #debug point! #debug point! 
+    print("out of loop");
     #debug point! #debug point! print(length(full.wv));
     return(full.wv)
 }
@@ -316,6 +331,15 @@ get.this.set <- function(ind.y) {
     #debug point! print("if not red above me, not a problem");
     this.set <- subset(half.set, half.set$times>=range.years.ws$Start[ind.y]);
     #debug point! print("if not red above me, not a problem");
+    if (length(this.set$times)==0) {
+      return(FALSE)
+    } else if (length(this.set$times)==1) {
+      if (is.null(this.set$times[1])) {
+        return(FALSE)
+      } else if (this.set$times[1]<range.years.ws$Start[1]) {
+        return(FALSE)
+      }
+    }
     return(this.set)
 }
 set.bi.dimnames <- function(bi) {
@@ -345,22 +369,28 @@ combine.sets.seamicro <- function(set1, set2) {
     return(nset)
 }
 get.estimate <- function(model.ws, prev.set, year.index) {
-    #debug point! print("in get.estimate");
+    #debug point! 
+  print("in get.estimate");
     past.set.length <- length(prev.set$times);
-    #prev.set <- c(prev.set, get.this.set(year.index-1));
     add.set <- get.this.set(year.index-1);
     #debug point! print("if not red above me, not a problem");
-    if (length(add.set$times)==0) {
-      #debug point! print("can't get the length of a zero year");
+    if (is.logical(add.set)) {
+      return(list(FALSE, prev.set))
+    } else if (length(add.set$times)==0) {
+      #debug point! print("can't get the length of zero year");
+      return(list(FALSE, prev.set))
+    } 
+    prev.set <- combine.sets.seamicro(prev.set, add.set);
+    if (length(prev.set$times)==past.set.length) {
       return(list(FALSE, prev.set))
     }
-    prev.set <- combine.sets.seamicro(prev.set, add.set);
     #debug point! print("prev.set");
-    wv <- gen.full.wv(model.wv = model.ws, num.years = year.index-1);
+    wv <- gen.full.wv(model.wv = model.ws, prev.set$times, year.index); 
     #debug point! 
     print(length(wv));
     prev.gv <- get.set.gridvals(prev.set);
-    #debug point! print("prev.gv - grid values");
+    #debug point! 
+    print("prev.gv - grid values");
     #debug point! 
     print(length(prev.gv$xg));
     #debug point! print(length(prev.gv$yg));
@@ -487,16 +517,18 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 ### MODEL 1: EQUAL WEIGHTS
 
 ```{r}
-m1.rsq.v <- 0;
+m1.rsq.v <- 0
 #because the first year has no estimate, it stays a zero
 year.index <- 2
 past.set <- get.this.set(1)
-while (year.index <= length(range.years.ws$End)) {
+end.num <- length(range.years.ws$End) + 1
+while (year.index < end.num) {
   #debug point!
+  print("Hi! I'm year:")
   #debug point! 
   print(year.index)
   #debug point! if(year.index>12) stop() year.index <- 12
-  past.group <- get.estimate(model1.weights, past.set, year.index)
+  past.group <- get.estimate(model1.weights, past.set, year.index - 1)
   past.bi <- past.group[1]
   past.set <- past.group[2]
   if (is.list(past.bi[1])) {

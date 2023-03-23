@@ -181,12 +181,61 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
-incr.by <- function(start, end, by) {
+expand.negs <- function(s, e, by) {}
+expand.overs <- function(s, e, by) {}
+divide.set.around0 <- function(s, e, by) {
+    if (s == e) {
+        return(s)
+    } else if (s > e) {
+        swap <- s;
+        s <- e;
+        e <- swap;
+    }
+    negs <- NULL;
+    zeds <- NULL;
+    overs <- NULL;
+    if (s<0) {
+        if (e<0) {
+            negs <- expand.negs(s, e, by);
+        } else if (e == 0) {
+            new.e <- -0.9;
+            negs <- expand.negs(s, new.e, by);
+            zeds <- 0;
+        }
+        new.e <- -0.9;
+        negs <- expand.negs(s, new.e, by);
+        zeds <- 0;
+        new.s <- 0.1;
+        overs <- expand.overs(new.s, e, by);
+    } else if (s == 0) {
+        
+    }
+    return(list(negs, zeds, overs))
+}
+incr.by <- function(s, e, by) {
     #check is right vals
+    if (!is.numeric(s)) {
+        return(FALSE)
+    } else if (!is.numeric(e)) {
+        return(FALSE)
+    } else if (!is.numeric(by)) {
+        return(FALSE)
+    } else if (by == 0) {
+        return(FALSE)
+    }
     #sep into negs, 0, pos
+    seps <- divide.set.around0(s, e, by);
+    if (length(seps) == 1) {
+      #debug point! 
+      print("you gave me a range of one, so here's it back.");
+      return(seps)
+    } 
     #incr as appropos
-    #recombine
-    #return
+    negs.set <- seps[1];
+    zeds.set <- seps[2];
+    overs.set <- seps[3];
+    #recombine and return
+    return(c(negs.set, zeds.set, overs.set))
 }
 add.tenths2front <- function(front, v) {
     front <- abs(front);
@@ -194,6 +243,11 @@ add.tenths2front <- function(front, v) {
     add.buff <- -0.1 * (front - 1);
     add.start <- add.end + add.buff;
     f.v <- incr.by(add.start, add.end, 0.1);
+    if (is.null(f.v)) {
+      return(v)
+    } else if (is.logical(f.v)) {
+      return(FALSE)
+    }
     #debug point! return(f.v)
     v2 <- c(f.v, v);
     return(v2)
@@ -204,6 +258,11 @@ add.tenths2back <- function(back, v) {
     add.buff <- 0.1 * (back - 1);
     add.end <- add.start + add.buff;
     b.v <- incr.by(add.start, add.end, 0.1);
+    if (is.null(b.v)) {
+      return(v)
+    } else if (is.logical(b.v)) {
+      return(FALSE)
+    }
     v2 <- c(v, b.v);
     return(v2)
 }
@@ -215,7 +274,13 @@ add.enough.tenths <- function(more, v) {
     #now is not odd
     add.half <- more/2;
     v <- add.tenths2back(add.half, v);
+    if (is.logical(v)) {
+      return(FALSE)
+    }
     v <- add.tenths2front(add.half, v);
+    if (is.logical(v)) {
+      return(FALSE)
+    }
     #debug point! return(length(v))
     return(v)
 }
@@ -228,7 +293,17 @@ get.set.gridvals <- function(this.set) {
     this.r.lat[2] <- ceiling(this.r.lat[2]);
     #now all coords should be included
     xg <- incr.by(this.r.long[1], this.r.long[2], 0.1);
+    if (is.null(xg)) {
+      return(FALSE)
+    } else if (is.logical(xg)) {
+      return(FALSE)
+    }
     yg <- incr.by(this.r.lat[1], this.r.lat[2], 0.1);
+    if (is.null(yg)) {
+      return(FALSE)
+    } else if (is.logical(yg)) {
+      return(FALSE)
+    }
     #everything is by tenths now
     mod.xg <- length(xg)%%length(this.set$longitude);
     mod.yg <- length(yg)%%length(this.set$latitude);
@@ -236,15 +311,29 @@ get.set.gridvals <- function(this.set) {
         #the grid does not divide into the coords and it doesn't like this
         needed <- length(this.set$longitude) - mod.xg;
         xg <- add.enough.tenths(needed, xg);
+        if (is.null(xg)) {
+          return(FALSE)
+        } else if (is.logical(xg)) {
+          return(FALSE)
+        }
     }
     if (length(yg)%%length(this.set$latitude) != 0) {
         #the grid does not divide into the coords and it doesn't like this
         needed <- length(this.set$latitude) - mod.yg;
         yg <- add.enough.tenths(needed, yg);
+        if (is.null(yg)) {
+          return(FALSE)
+        } else if (is.logical(yg)) {
+          return(FALSE)
+        }
     }
     return(list("xg" = xg, "yg" = yg))
 }
 ws.1986.gv <- get.set.gridvals(ws.1986)
+if (is.logical(xg)) {
+  stop("something went wrong with get.set.gridvals")
+}
+  
 ws.1986.bi <- interpBarnes(x = ws.1986$longitude, y = ws.1986$latitude, z = ws.1986$pieces_km2, xg = ws.1986.gv$xg, yg =  ws.1986.gv$yg, iterations = 1)
 ```
 
@@ -418,6 +507,9 @@ get.estimate <- function(model.ws, prev.set, year.index) {
     wv <- gen.full.wv(model.wv = model.ws, prev.set$times, year.index); 
     #debug point! print(length(wv));
     prev.gv <- get.set.gridvals(prev.set);
+    if (is.logical(prev.gv)) {
+      return(list(FALSE, prev.set))
+    }
     #debug point! print("prev.gv - grid values");
     #debug point! print(length(prev.gv$xg));
     #debug point! print(length(prev.gv$yg));
@@ -432,6 +524,9 @@ get.actual <- function(year.index) {
     this.set <- get.this.set(year.index);
     if (is.logical(this.set)) {
       gv <- get.set.gridvals(workingset.seamicro);
+      if (is.logical(gv)) {
+        return(FALSE)
+      }
         x <- length(gv$xg);
         y <- length(gv$yg);
         wg <- Matrix(data = rep(0, times = x*y), ncol = x, nrow = y);
@@ -440,6 +535,9 @@ get.actual <- function(year.index) {
         return(list("xg" = gv$xg, "yg" = gv$yg, "zg" = zg, "wg" = wg, "zd" = zd));
     } else if (length(this.set$times)<=0) {
         gv <- get.set.gridvals(workingset.seamicro);
+        if (is.logical(gv)) {
+        return(FALSE)
+      }
         x <- length(gv$xg);
         y <- length(gv$yg);
         wg <- Matrix(data = rep(0, times = x*y), ncol = x, nrow = y);
@@ -450,6 +548,9 @@ get.actual <- function(year.index) {
     #debug point! 
     print("get.actual: next is gridvals");
     gv <- get.set.gridvals(this.set);
+    if (is.logical(gv)) {
+        return(FALSE)
+      }
     #debug point! 
     print("get.actual: gridvals done, next is ib");
     this.bi <- interpBarnes(x = this.set$longitude, y = this.set$latitude, z = this.set$pieces_km2, xg = gv$xg, yg = gv$yg, iterations = 1);

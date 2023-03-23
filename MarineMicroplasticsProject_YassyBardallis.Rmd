@@ -181,10 +181,24 @@ range.years.ws <- data.frame(seq(from = as.POSIXct("1986-01-01", tz = ""), to = 
 colnames(range.years.ws) <- c("Start", "End")
 rownames(range.years.ws) <- labels.years.ws
 ws.1986 <- subset(workingset.seamicro, subset = workingset.seamicro$times<=range.years.ws$End[1])
-expand.negs <- function(s, e, by) {}
-expand.overs <- function(s, e, by) {}
+expand.negs <- function(s, e, by) {
+    if (by < 0) {
+        by <- by * -1;
+    }
+    negs <- seq(s, e, by);
+    return(negs)
+}
+expand.overs <- function(s, e, by) {
+    if (by < 0) {
+        by <- by * -1;
+    }
+    overs <- seq(s, e, by);
+    return(overs)
+}
 divide.set.around0 <- function(s, e, by) {
-    if (s == e) {
+    if (by == 0) {
+        return(NULL)
+    } else if (s == e) {
         return(s)
     } else if (s > e) {
         swap <- s;
@@ -198,17 +212,22 @@ divide.set.around0 <- function(s, e, by) {
         if (e<0) {
             negs <- expand.negs(s, e, by);
         } else if (e == 0) {
-            new.e <- -0.9;
+            new.e <- -0.1;
             negs <- expand.negs(s, new.e, by);
             zeds <- 0;
+        } else if (e > 0) {
+            new.e <- -0.1;
+            negs <- expand.negs(s, new.e, by);
+            zeds <- 0;
+            new.s <- 0.1;
+            overs <- expand.overs(new.s, e, by);
         }
-        new.e <- -0.9;
-        negs <- expand.negs(s, new.e, by);
+    } else if (s == 0) {
         zeds <- 0;
         new.s <- 0.1;
         overs <- expand.overs(new.s, e, by);
-    } else if (s == 0) {
-        
+    } else if (s > 0) {
+        overs <- expand.overs(s, e, by);
     }
     return(list(negs, zeds, overs))
 }
@@ -226,16 +245,19 @@ incr.by <- function(s, e, by) {
     #sep into negs, 0, pos
     seps <- divide.set.around0(s, e, by);
     if (length(seps) == 1) {
-      #debug point! 
-      print("you gave me a range of one, so here's it back.");
+      if (is.null(seps)) {
+        return(FALSE)
+      }
+      #debug point! print("you gave me a range of one, so here's it back.");
       return(seps)
     } 
     #incr as appropos
-    negs.set <- seps[1];
-    zeds.set <- seps[2];
-    overs.set <- seps[3];
+    negs.set <- seps[[1]];
+    zeds.set <- seps[[2]];
+    overs.set <- seps[[3]];
     #recombine and return
-    return(c(negs.set, zeds.set, overs.set))
+    set.all <- c(negs.set, zeds.set, overs.set);
+    return(set.all)
 }
 add.tenths2front <- function(front, v) {
     front <- abs(front);
@@ -284,13 +306,38 @@ add.enough.tenths <- function(more, v) {
     #debug point! return(length(v))
     return(v)
 }
+range2floorceil <- function(v) {
+    if (length(v)==1) {
+        if (is.null(v)) {
+            return(FALSE)
+        } else if (is.logical(v)) {
+            return(FALSE)
+        }
+    }
+    r <- range(v);
+    b <- floor(r[1]);
+    t <- ceiling(r[2]);
+    return(c(b, t))
+}
 get.set.gridvals <- function(this.set) {
-    this.r.long <- range(this.set$longitude);
-    this.r.lat <- range(this.set$latitude);
-    this.r.long[1] <- floor(this.r.long[1]);
-    this.r.lat[1] <- floor(this.r.lat[1]);
-    this.r.long[2] <- ceiling(this.r.long[2]);
-    this.r.lat[2] <- ceiling(this.r.lat[2]);
+    this.r.long <- range2floorceil(this.set$longitude);
+    v <- this.r.long;
+    if (length(v)==1) {
+        if (is.null(v)) {
+            return(FALSE)
+        } else if (is.logical(v)) {
+            return(FALSE)
+        }
+    }
+    this.r.lat <- range2floorceil(this.set$latitude);
+    v <- this.r.lat;
+    if (length(v)==1) {
+        if (is.null(v)) {
+            return(FALSE)
+        } else if (is.logical(v)) {
+            return(FALSE)
+        }
+    }
     #now all coords should be included
     xg <- incr.by(this.r.long[1], this.r.long[2], 0.1);
     if (is.null(xg)) {
@@ -330,7 +377,11 @@ get.set.gridvals <- function(this.set) {
     return(list("xg" = xg, "yg" = yg))
 }
 ws.1986.gv <- get.set.gridvals(ws.1986)
-if (is.logical(xg)) {
+xg <- ws.1986.gv[1]
+yg <- ws.1986.gv[2]
+if (is.logical(xg) || is.null(xg)) {
+  stop("something went wrong with get.set.gridvals")
+} else if (is.logical(yg) || is.null(yg)) {
   stop("something went wrong with get.set.gridvals")
 }
   

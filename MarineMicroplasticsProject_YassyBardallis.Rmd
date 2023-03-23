@@ -703,7 +703,9 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 }
 ```
 
-### MODEL 1: EQUAL WEIGHTS
+### RSS COMPUTATION AND RESULTS
+
+After a considerable amount of runtime passes, the code we have written fro this paper computed the following values for the RSS value of each model at each successive year. This code is far from optimal, and additional work could be done to improve its functionality, complexity, and speed. As you can see from the table below, the values are incredibly large; once caveat is that no observations were taken in 1988, and, as we could not determine a value for that model because of this absence of data, the RSS has been set to zero.
 
 ```{r echo=FALSE}
 run.this.model <- function(model.num) {
@@ -774,6 +776,8 @@ for (n in model.nums) {
 results <- subset(results, select = -years)
 kable(results, format = "pipe", caption = "RSS values for Three Weight-differentiated Models")
 ```
+
+## GRAPHICAL ANALYSIS
 
 ## CONCLUSION
 

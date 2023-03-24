@@ -8,7 +8,8 @@ bibliography: references.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library.dynam(interp)
+install.packages(c("interp", "oce", "Matrix", "knitr"))
+#library.dynam(interp)
 library.dynam(oce)
 library.dynam(Matrix)
 library.dynam(knitr)
@@ -705,7 +706,7 @@ get.r.squared.total <- function(est.bi, actual.bi) {
 
 ### RSS COMPUTATION AND RESULTS
 
-After a considerable amount of runtime passes, the code we have written fro this paper computed the following values for the RSS value of each model at each successive year. This code is far from optimal, and additional work could be done to improve its functionality, complexity, and speed. As you can see from the table below, the values are incredibly large; once caveat is that no observations were taken in 1988, and, as we could not determine a value for that model because of this absence of data, the RSS has been set to zero.
+After a considerable amount of runtime passes, the code we have written for this paper computed the following values for the RSS value of each model at each successive year. This code is far from optimal, and additional work could be done to improve its functionality, complexity, and speed. As you can see from the table below, the values are incredibly large; once caveat is that no observations were taken in 1988, and, as we could not determine a value for that model because of this absence of data, the RSS has been set to zero.
 
 ```{r echo=FALSE}
 run.this.model <- function(model.num) {
@@ -766,7 +767,7 @@ return(m.rsq.v)
 }
 results <- data.frame("years"=labels.years.ws, row.names = labels.years.ws)
 model.nums <- c(1:3)
-model.col.names <- labels.years.ws
+model.col.names <- "years"
 for (n in model.nums) {
   model.str <- paste("Model.Number", as.character(n), sep = ".")
   results$str <- run.this.model(n)
@@ -778,6 +779,12 @@ kable(results, format = "pipe", caption = "RSS values for Three Weight-different
 ```
 
 ## GRAPHICAL ANALYSIS
+
+```{r echo=TRUE, warning=FALSE}
+results.ts <- ts(data = results, start = c(1986, 1), end = 2012, frequency = 1, class = "ts", names = c("Model 1", "Model 2", "Model 3"))
+plot.ts(x = results.ts, y = NULL, main = "RSS Values of Three Models", xy.labels = TRUE, log = "y", axes = TRUE, type="o")
+grid(nx = 23, ny = NA, col = "darkgrey", lty = "dotdash")
+```
 
 ## CONCLUSION
 

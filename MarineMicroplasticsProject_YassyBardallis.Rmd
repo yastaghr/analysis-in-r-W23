@@ -10,9 +10,9 @@ bibliography: references.bib
 knitr::opts_chunk$set(echo = TRUE)
 install.packages(c("interp", "oce", "Matrix", "knitr"))
 #library.dynam(interp)
-library.dynam(oce)
-library.dynam(Matrix)
-library.dynam(knitr)
+library(oce)
+library(Matrix)
+library(knitr)
 SEA_MICRO <- read.csv("SEA_MICRO.csv")
 colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 ```
@@ -21,14 +21,14 @@ colnames(SEA_MICRO) <- c("times", "latitude", "longitude", "pieces_km2")
 
 ### ORIGIN AND PERTINENCE OF THIS DATASET
 
-For this project, we have chosen to work with a dataset on marine microplastic density in samples drawn from seawater worldwide. These datasets contain information quantifying the presence of microplastics at specific points in the world on specific dates. This dataset is termed the "SEA_MICRO" dataset and was acquired from [kaggle.com](https://www.kaggle.com/datasets/brsdincer/marine-microplastic-on-world-density-noaa) on 2023-02-24 at 10:43:05; however, the original data was used in the project funded by a grant from the NOAA Marine Debris Program to the University of Washington, Tacoma [referenced here](https://marinedebris.noaa.gov/technical-memorandum/laboratory-methods-analysis-microplastics-marine-environment) which sought to create a series of simple standardized methods for collecting and measuring the quantity of microplastics in water samples, samples of sediments from the bed of the body of water, and personal care products.
+For this project, we have chosen to work with a dataset on marine microplastic density in samples drawn from seawater worldwide. These datasets contain information quantifying the presence of microplastics at specific points in the world on specific dates. This dataset is termed the "SEA_MICRO" dataset and was acquired from [@marinem] on 2023-02-24 at 10:43:05; however, the original data was used in the project funded by a grant from the NOAA Marine Debris Program to the University of Washington, Tacoma [@masura2015] which sought to create a series of simple standardized methods for collecting and measuring the quantity of microplastics in water samples, samples of sediments from the bed of the body of water, and personal care products.
 
-Marine microplastics, defined as plastic particles under 5mm, pervade our ecosystem. They have been found in everything from [fish](https://www.mdpi.com/2673-8929/1/1/12) to [human placentae](https://ehp.niehs.nih.gov/doi/10.1289/EHP10873); while we are still exploring the impact they have on our world, they are known to be detrimental to the health and life of coral, one study of this phenomenon [can be found here](https://www.nature.com/articles/s42003-021-01961-1). Other species, including us, have been and are being investigated. [You can learn more about this ongoing research here](http://libproxy.uoregon.edu/login?url=https://search.ebscohost.com/login.aspx?direct=true&db=aph&AN=147699782&login.asp&site=ehost-live&scope=site). As the marine world is intricately intertwined with our own, research into their movements is imperative.
+Marine microplastics, defined as plastic particles under 5mm, pervade our ecosystem. They have been found in everything from [@constant2022] to [@dybas2020]; while we are still exploring the impact they have on our world, they are known to be detrimental to the health and life of coral, one study of this phenomenon [@corinaldesi2021]. Other species, including us, have been and are being investigated. As the marine world is intricately intertwined with our own, research into their movements is imperative.
 
 ### MAKEUP OF THE DATASET
 
-The 7755 observations within this dataset are each described by the date they were collected, the longitude and latitude at which they were collected, and the number of pieces of microplastic per kilometer squared. This last value was determined by the method found on pages 10-19 of the manual that was written and published according to the project's goal [found here](https://repository.library.noaa.gov/view/noaa/10296). These samples are not necessarily ordered or random but likely were drawn from sources available to the researchers at the time. The authors of this project could not determine this because neither the manual nor the poster of the Kaggle dataset recorded this information. Due to this lack of knowledge, we cannot determine the amount of noise in this dataset. We could not discover by whom the original water samples were collected or by what groups. However, we believe that, due to the standardized method used to process this data referred to above, any error in the content of this dataset is limited only by the limitations of our knowledge rather than any disparity in collection methodology.\
-We did not preprocess this data in any way; however, it may or may not have undergone this process before its posting on Kaggle. We know of at least three projects that have used this dataset in the past, although there may be more. The manual itself [can be found here](https://repository.library.noaa.gov/view/noaa/10296). Two more projects were connected to the dataset posting on Kaggle; a project in marine data visualization [which can be found here](https://www.kaggle.com/code/virajkadam/marine-plastic-visualization) and a project on the process of analyzing marine data [that can be found here](https://www.kaggle.com/code/brsdincer/marine-micro-plastic-analysis-process). It is undoubtedly a dataset that can be used in future research and analysis of the marine microplastic density and dispersion from 1986 to 2012, albeit with caution due to the uncertain background of that data.
+The 7755 observations within this dataset are each described by the date they were collected, the longitude and latitude at which they were collected, and the number of pieces of microplastic per kilometer squared. This last value was determined by the method found on pages 10-19 of the manual that was written and published according to the project's goal [@masura2015]. These samples are not necessarily ordered or random but likely were drawn from sources available to the researchers at the time. The authors of this project could not determine this because neither the manual nor the poster of the Kaggle dataset recorded this information. Due to this lack of knowledge, we cannot determine the amount of noise in this dataset. We could not discover by whom the original water samples were collected or by what groups. However, we believe that, due to the standardized method used to process this data referred to above, any error in the content of this dataset is limited only by the limitations of our knowledge rather than any disparity in collection methodology.\
+We did not preprocess this data in any way; however, it may or may not have undergone this process before its posting on Kaggle. We know of at least three projects that have used this dataset in the past, although there may be more. The manual itself was one. Two more projects were connected to the dataset posting on Kaggle; a project in marine data visualization which [@marinep] and a project on the process of analyzing marine data [@nikitalitvinova]. It is undoubtedly a dataset that can be used in future research and analysis of the marine microplastic density and dispersion from 1986 to 2012, albeit with caution due to the uncertain background of that data.
 
 ### PROCESSING THE DATASET
 
@@ -780,6 +780,8 @@ kable(results, format = "pipe", caption = "RSS values for Three Weight-different
 
 ## GRAPHICAL ANALYSIS
 
+After graphing was completed, a problem with the formation (or possibly the premise behind) our models was discovered. As the graph below and the table above show, the RSS values at all years for all the values are functionally identical. We believe that, due to the immense size of these numbers and the storage format of the computer architecture on which they were calculated, the level of detail which would be needed to differentiate these models has been lost.
+
 ```{r echo=TRUE, warning=FALSE}
 results.ts <- ts(data = results, start = c(1986, 1), end = 2012, frequency = 1, class = "ts", names = c("Model 1", "Model 2", "Model 3"))
 plot.ts(x = results.ts, y = NULL, main = "RSS Values of Three Models", xy.labels = TRUE, log = "y", axes = TRUE, type="o")
@@ -788,6 +790,10 @@ grid(nx = 23, ny = NA, col = "darkgrey", lty = "dotdash")
 
 ## CONCLUSION
 
+It is impossible to draw any conclusions, based on this data and analysis, on whether or not this method is or is not usable to estimate future amounts and locations of microplastics in the West Atlantic and Caribbean; this is true with or without changes in weight values for different sets of observations from different years.
+
 ### POTENTIAL USES
+
+Despite our inability to draw conclusions about this methodology for modeling datasets like this, further investigation of the code and storage structure of it may be able to do so. The development of our understanding of the current and future behavior of microplastics in our oceans is imperitive. Our current understanding of that microplastics' effects on our own biology [@landrigan2023] and the ecosystems around us [@dusza2022; @dianna.parker2013; @corinaldesi2021; @constant2022; @coralre; @bates2018] demands that we learn more in order to mitigate, and potentially even reverse, its impact.
 
 ## BIBLIOGRAPHY
